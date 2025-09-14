@@ -12,17 +12,21 @@ import java.util.concurrent.TimeUnit
 
 interface WeatherApi {
     @GET("data/2.5/weather")
-    fun getWeather( // Consider making this a suspend function
-        @Query("q") city: String = "Moscow",
+    suspend fun getWeather(
+        @Query("q") city: String = "Moscow", // Город по умолчанию
         @Query("appid") apiKey: String,
-        @Query("units") units: String = "metric"
-    ): Deferred<Weather> // For suspend fun, this would be: suspend fun getWeather(...): Weather
+        @Query("units") units: String = "metric" // Температура в °C
+    ): Weather
 
     companion object {
         private const val BASE_URL = "https://api.openweathermap.org/"
 
         fun create(): WeatherApi {
-            val json = Json { ignoreUnknownKeys = true }
+            val json = Json {
+                ignoreUnknownKeys = true // Игнорировать неизвестные ключи на всех уровнях
+                isLenient = false // Оставляем строгую проверку, если не нужно
+                coerceInputValues = false // Не преобразовывать значения автоматически
+            }
             val client = OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -38,4 +42,3 @@ interface WeatherApi {
         }
     }
 }
-    
