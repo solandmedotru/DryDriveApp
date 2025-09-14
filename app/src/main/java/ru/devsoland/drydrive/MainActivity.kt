@@ -6,8 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable // <<< ДОБАВИТЬ ИМПОРТ
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.size
+// import androidx.compose.foundation.layout.size // Этот импорт уже есть выше, если используется только для Modifier.size(Dp)
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -19,26 +20,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+// import androidx.compose.runtime.getValue // Уже есть
+// import androidx.compose.runtime.setValue // Уже есть
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor // <<< ДОБАВИТЬ ИМПОРТ
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow // <<< ДОБАВИТЬ ИМПОРТ
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
-import ru.devsoland.drydrive.data.City // Предполагаем, что этот класс существует
-import ru.devsoland.drydrive.data.Weather // Предполагаем, что этот класс существует
-import ru.devsoland.drydrive.ui.DisplayDayWeather // Предполагаем, что этот файл/класс существует
+import ru.devsoland.drydrive.data.City
+import ru.devsoland.drydrive.data.Weather
+import ru.devsoland.drydrive.ui.DisplayDayWeather
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
 import java.util.Locale
+import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 
 // Модели из UiModels.kt (или аналогичного файла)
 enum class RecommendationType {
@@ -68,7 +75,7 @@ class MainActivity : ComponentActivity() {
             DryDriveTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background // Базовый фон из темы
+                    color = MaterialTheme.colorScheme.background
                 ) {
                     DryDriveScreen()
                 }
@@ -77,75 +84,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CitySearchDropDown(
-    searchQuery: String,
-    onQueryChange: (String) -> Unit,
-    cities: List<City>,
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
-    onCitySelected: (City, String) -> Unit,
-    modifier: Modifier = Modifier,
-    isLoading: Boolean,
-    errorMessage: String?
-) {
-    Box(modifier = modifier) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onQueryChange,
-            label = { Text("Введите город", color = Color.White.copy(alpha = 0.7f)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            trailingIcon = {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                }
-            },
-            isError = errorMessage != null,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White.copy(alpha = 0.9f),
-                cursorColor = Color.White,
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
-                focusedLabelColor = Color.White,
-                unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                errorBorderColor = MaterialTheme.colorScheme.error,
-                errorLabelColor = MaterialTheme.colorScheme.error,
-                errorTextColor = MaterialTheme.colorScheme.error,
-                disabledTextColor = Color.White.copy(alpha = 0.5f),
-                disabledBorderColor = Color.White.copy(alpha = 0.3f),
-                disabledLabelColor = Color.White.copy(alpha = 0.5f),
-            )
-        )
-        if (errorMessage != null) {
-            Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 4.dp)
-                    .align(Alignment.BottomStart)
-            )
-        }
-        DropdownMenu(
-            expanded = expanded && cities.isNotEmpty(),
-            onDismissRequest = onDismissRequest,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            cities.forEach { city ->
-                DropdownMenuItem(
-                    text = { Text(formatCityName(city)) },
-                    onClick = {
-                        val formattedName = formatCityName(city)
-                        onCitySelected(city, formattedName)
-                    }
-                )
-            }
-        }
-    }
-}
+// CitySearchDropDown функция УДАЛЕНА
 
 @Composable
 fun WeatherDetails(weather: Weather) {
@@ -192,10 +131,14 @@ fun ForecastDayCard(dayWeather: DisplayDayWeather, isCurrentDay: Boolean) {
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        modifier = Modifier.width(80.dp).height(120.dp)
+        modifier = Modifier
+            .width(80.dp)
+            .height(120.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(vertical = 16.dp, horizontal = 8.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 16.dp, horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -264,18 +207,28 @@ fun DailyForecastPlaceholder() {
     val placeholderColor = Color.White.copy(alpha = 0.3f)
     val cardBackgroundColor = Color.Black.copy(alpha = 0.2f)
     val cardShape = RoundedCornerShape(12.dp)
-    val cardModifier = Modifier.width(80.dp).height(120.dp)
+    val cardModifier = Modifier
+        .width(80.dp)
+        .height(120.dp)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         repeat(5) {
             Card(shape = cardShape, colors = CardDefaults.cardColors(containerColor = cardBackgroundColor), modifier = cardModifier) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(vertical = 16.dp, horizontal = 8.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 16.dp, horizontal = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(modifier = Modifier.size(width = 40.dp, height = 16.dp).background(placeholderColor, RoundedCornerShape(4.dp)))
-                    Box(modifier = Modifier.size(36.dp).background(placeholderColor, CircleShape))
-                    Box(modifier = Modifier.size(width = 30.dp, height = 20.dp).background(placeholderColor, RoundedCornerShape(4.dp)))
+                    Box(modifier = Modifier
+                        .size(width = 40.dp, height = 16.dp)
+                        .background(placeholderColor, RoundedCornerShape(4.dp)))
+                    Box(modifier = Modifier
+                        .size(36.dp)
+                        .background(placeholderColor, CircleShape))
+                    Box(modifier = Modifier
+                        .size(width = 30.dp, height = 20.dp)
+                        .background(placeholderColor, RoundedCornerShape(4.dp)))
                 }
             }
         }
@@ -293,12 +246,13 @@ fun DryDriveScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // --- ОПРЕДЕЛЯЕМ ЦВЕТ ФОНА ЭКРАНА ---
-    val screenBackgroundColor = Color(0xFF1A1C20) // ЗАМЕНИТЕ НА ЦВЕТ ИЗ ВАШЕГО ДИЗАЙНА
+    val screenBackgroundColor = Color(0xFF1A1C20)
+
+    var isCitySearchActiveInAppBar by remember { mutableStateOf(false) } // <<< НОВОЕ СОСТОЯНИЕ
 
     val carImageResId = when (uiState.weather?.weather?.getOrNull(0)?.main?.lowercase(Locale.ROOT)) {
-        "rain", "snow", "thunderstorm", "drizzle", "mist", "fog" -> R.drawable.car_dirty // ЗАМЕНИТЕ НА СВОЙ РЕСУРС
-        else -> R.drawable.car_clean // ЗАМЕНИТЕ НА СВОЙ РЕСУРС
+        "rain", "snow", "thunderstorm", "drizzle", "mist", "fog" -> R.drawable.car_dirty
+        else -> R.drawable.car_clean
     }
     val carContentDescription = if (carImageResId == R.drawable.car_dirty) "Грязный автомобиль" else "Чистый автомобиль"
 
@@ -321,39 +275,158 @@ fun DryDriveScreen(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Местоположение", tint = Color.White, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = uiState.cityForDisplay.take(15) + if (uiState.cityForDisplay.length > 15) "..." else "",
-                                color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium
-                            )
-                            Icon(imageVector = Icons.Filled.ArrowDropDown, contentDescription = "Выбрать город", tint = Color.White)
+                        // --- НАЧАЛО ИЗМЕНЕНИЙ В TITLE ---
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            if (isCitySearchActiveInAppBar) {
+                                OutlinedTextField(
+                                    value = uiState.searchQuery,
+                                    onValueChange = { query: String -> viewModel.onEvent(DryDriveEvent.SearchQueryChanged(query)) },
+                                    label = @Composable { // Явно указываем, что лямбда является Composable
+                                        Text("Поиск города...", color = Color.White.copy(alpha = 0.7f))
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(end = 16.dp), // Небольшой отступ справа от поля ввода
+                                    singleLine = true,
+                                    textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White.copy(alpha = 0.8f),
+                                        unfocusedBorderColor = Color.White.copy(alpha = 0.4f),
+                                        // --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        disabledContainerColor = Color.Transparent, // На случай, если поле может быть disabled
+                                        errorContainerColor = Color.Transparent,   // На случай ошибки
+                                        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+                                        errorCursorColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    trailingIcon = @Composable {
+                                        if (uiState.isLoadingCities) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp), // Dp для размера
+                                                color = Color.White,
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else if (uiState.searchQuery.isNotEmpty()) {
+                                            IconButton(onClick = { viewModel.onEvent(DryDriveEvent.SearchQueryChanged("")) }) {
+                                                Icon(Icons.Filled.Clear, contentDescription = "Очистить", tint = Color.White.copy(alpha = 0.7f))
+                                            }
+                                        }
+                                    }
+                                )
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { isCitySearchActiveInAppBar = true }
+                                        .padding(start = 0.dp) // Прижимаем к левому краю
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.LocationOn,
+                                        contentDescription = "Местоположение",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp) // Dp для размера
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = uiState.cityForDisplay.ifEmpty { "Выберите город" }, // Отображаем полное имя или заглушку
+                                        color = Color.White,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        textAlign = TextAlign.Start, // Прижимаем текст влево
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis // Обрезка, если не помещается
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowDropDown, // Иконка выпадающего списка
+                                        contentDescription = "Выбрать город",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+
+                            // DropdownMenu для результатов поиска
+                            DropdownMenu(
+                                expanded = isCitySearchActiveInAppBar && uiState.citySearchResults.isNotEmpty() && uiState.searchQuery.isNotBlank(),
+                                onDismissRequest = {
+                                    viewModel.onEvent(DryDriveEvent.DismissCitySearchDropDown) // Только скрываем список
+                                    // isCitySearchActiveInAppBar = false // Опционально: скрывать ли поле ввода при клике вне меню
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth(0.9f) // Занимает почти всю ширину TopAppBar
+                                    .align(Alignment.TopStart) // Выравниваем по левому краю поля ввода
+                                    .offset(y = (56).dp) // Смещаем вниз (примерная высота TopAppBar)
+                            ) {
+                                uiState.citySearchResults.forEach { city ->
+                                    DropdownMenuItem(
+                                        text = { Text(formatCityName(city)) },
+                                        onClick = {
+                                            val formattedName = formatCityName(city)
+                                            viewModel.onEvent(DryDriveEvent.CitySelectedFromSearch(city, formattedName))
+                                            isCitySearchActiveInAppBar = false // Скрываем поле поиска после выбора
+                                        }
+                                    )
+                                }
+                                // Обработка состояний загрузки, ошибки, "не найдено"
+                                if (uiState.isLoadingCities && uiState.citySearchResults.isEmpty() && uiState.searchQuery.isNotBlank()) {
+                                    DropdownMenuItem(
+                                        text = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) } },
+                                        enabled = false, // Делаем некликабельным
+                                        onClick = {}
+                                    )
+                                } else if (uiState.citySearchErrorMessage != null && uiState.citySearchResults.isEmpty() && uiState.searchQuery.isNotBlank() && !uiState.isLoadingCities) {
+                                    DropdownMenuItem(
+                                        text = { Text(uiState.citySearchErrorMessage!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+                                        enabled = false,
+                                        onClick = { }
+                                    )
+                                } else if (uiState.citySearchResults.isEmpty() && uiState.searchQuery.isNotBlank() && !uiState.isLoadingCities && uiState.citySearchErrorMessage == null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Город не найден", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+                                        enabled = false,
+                                        onClick = { }
+                                    )
+                                }
+                            }
                         }
+                        // --- КОНЕЦ ИЗМЕНЕНИЙ В TITLE ---
                     },
                     actions = {
-                        IconButton(onClick = { /* TODO: Действие для поиска */ Log.d("TopAppBar", "Search icon clicked") }) {
-                            Icon(imageVector = Icons.Filled.Search, contentDescription = "Поиск", tint = Color.White)
+                        // --- НАЧАЛО ИЗМЕНЕНИЙ В ACTIONS ---
+                        if (isCitySearchActiveInAppBar) {
+                            TextButton(onClick = {
+                                isCitySearchActiveInAppBar = false
+                                // Опционально:viewModel.onEvent(DryDriveEvent.SearchQueryChanged("")) // Очистить поиск при нажатии ОК
+                            }) {
+                                Text("ОК", color = Color.White, fontWeight = FontWeight.Medium)
+                            }
+                        } else {
+                            IconButton(onClick = { isCitySearchActiveInAppBar = true }) { // Иконка поиска теперь активирует режим ввода
+                                Icon(imageVector = Icons.Filled.Search, contentDescription = "Поиск", tint = Color.White)
+                            }
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Меню", tint = Color.White)
+                            }
                         }
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Меню", tint = Color.White)
-                        }
+                        // --- КОНЕЦ ИЗМЕНЕНИЙ В ACTIONS ---
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = Color.Transparent // Тулбар прозрачный
+                        containerColor = Color.Transparent
                     )
                 )
             },
             bottomBar = {
                 NavigationBar(
-                    containerColor = Color.Black.copy(alpha = 0.8f) // Фон для BottomBar
+                    containerColor = Color.Black.copy(alpha = 0.8f)
                 ) {
                     val navItems = listOf("Главная", "Карта", "Настройки")
                     var selectedItemIndex by remember { mutableStateOf(0) }
                     navItems.forEachIndexed { index, itemTitle ->
                         NavigationBarItem(
                             selected = selectedItemIndex == index,
-                            onClick = { selectedItemIndex = index /* TODO: Handle navigation */ },
+                            onClick = { selectedItemIndex = index },
                             icon = {
                                 val iconTint = if (selectedItemIndex == index) Color.White else Color.White.copy(alpha = 0.7f)
                                 when (itemTitle) {
@@ -372,13 +445,11 @@ fun DryDriveScreen(
             Box(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(screenBackgroundColor) // <--- ФОН ЭКРАНА
-                    .padding(paddingValues)           // <--- ОТСТУПЫ SCAFFOLD ПОСЛЕ ФОНА
+                    .background(screenBackgroundColor)
+                    .padding(paddingValues)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                    // Фон здесь не нужен, он у родительского Box
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     // СЕКЦИЯ 1: "Погода-Автомобиль"
                     Box(
@@ -386,37 +457,32 @@ fun DryDriveScreen(
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
-                        Image( // Фон города
-                            painter = painterResource(id = R.drawable.city_background), // ЗАМЕНИТЕ
+                        Image(
+                            painter = painterResource(id = R.drawable.city_background),
                             contentDescription = "Фон города",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
-                        Box( // Затемняющий слой
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 0.6f))
                         )
-                        Column( // Контент поверх фона города
+                        Column(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 24.dp)
                         ) {
-                            CitySearchDropDown(
-                                searchQuery = uiState.searchQuery,
-                                onQueryChange = { query -> viewModel.onEvent(DryDriveEvent.SearchQueryChanged(query)) },
-                                cities = uiState.citySearchResults,
-                                expanded = uiState.isSearchDropDownExpanded,
-                                onDismissRequest = { viewModel.onEvent(DryDriveEvent.DismissCitySearchDropDown) },
-                                onCitySelected = { city, formattedName -> viewModel.onEvent(DryDriveEvent.CitySelectedFromSearch(city, formattedName)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                isLoading = uiState.isLoadingCities,
-                                errorMessage = uiState.citySearchErrorMessage
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            // CitySearchDropDown УДАЛЕН ОТСЮДА
+                            Spacer(modifier = Modifier.height(16.dp)) // Компенсирующий отступ
+
                             when {
-                                uiState.isLoadingWeather && uiState.weather == null -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 50.dp))
-                                uiState.weatherErrorMessage != null && uiState.weather == null -> Text(text = uiState.weatherErrorMessage!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 50.dp))
+                                uiState.isLoadingWeather && uiState.weather == null -> CircularProgressIndicator(modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(vertical = 50.dp))
+                                uiState.weatherErrorMessage != null && uiState.weather == null -> Text(text = uiState.weatherErrorMessage!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 50.dp))
                                 uiState.weather != null -> {
                                     WeatherDetails(weather = uiState.weather!!)
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -429,18 +495,20 @@ fun DryDriveScreen(
                                         )
                                     }
                                 }
-                                else -> Column(modifier = Modifier.fillMaxWidth().height(150.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text("Выберите город", color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 50.dp)) }
+                                else -> Column(modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text("Выберите город", color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 50.dp)) }
                             }
-                            Spacer(modifier = Modifier.weight(1f)) // Отодвигает машину вниз
+                            Spacer(modifier = Modifier.weight(1f))
                             if (uiState.weather != null) {
                                 Image(
-                                    painter = painterResource(id = carImageResId), // ЗАМЕНИТЕ
+                                    painter = painterResource(id = carImageResId),
                                     contentDescription = carContentDescription,
                                     modifier = Modifier
                                         .fillMaxWidth(0.8f)
                                         .aspectRatio(16f / 9f)
                                         .align(Alignment.CenterHorizontally)
-                                        .padding(bottom = 16.dp), // Отступ машины от низа секции "Погода-Автомобиль"
+                                        .padding(bottom = 16.dp),
                                     contentScale = ContentScale.Fit
                                 )
                             }
@@ -465,16 +533,20 @@ fun DryDriveScreen(
                             .padding(top = 16.dp, bottom = 20.dp)
                     ) {
                         when {
-                            uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { DailyForecastPlaceholder(); CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp) }
-                            uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty() -> Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { Text(text = "Прогноз недоступен", color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), textAlign = TextAlign.Center) }
+                            uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp), contentAlignment = Alignment.Center) { DailyForecastPlaceholder(); CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp) }
+                            uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty() -> Box(modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp), contentAlignment = Alignment.Center) { Text(text = "Прогноз недоступен", color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), textAlign = TextAlign.Center) }
                             uiState.dailyForecasts.isNotEmpty() -> DailyForecastRow(forecasts = uiState.dailyForecasts)
                             else -> DailyForecastPlaceholder()
                         }
                     }
-                } // Конец основного Column для секций
-            } // Конец Box с фоном экрана и отступами Scaffold
-        } // Конец Scaffold
-    } // Конец ModalNavigationDrawer
+                }
+            }
+        }
+    }
 }
 
 @Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
@@ -484,4 +556,3 @@ fun DryDriveScreenPreview() {
         DryDriveScreen()
     }
 }
-
