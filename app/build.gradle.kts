@@ -93,6 +93,8 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.57.1") // Обновлено
     ksp("com.google.dagger:hilt-compiler:2.57.1") // Обновлено
 
+    // Для ViewModel с Hilt
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0") // Если будете использовать hiltViewModel()
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2") // Последняя версия
 

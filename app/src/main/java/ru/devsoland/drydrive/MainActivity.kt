@@ -38,13 +38,17 @@ import ru.devsoland.drydrive.data.Weather
 import ru.devsoland.drydrive.data.WeatherApi
 import ru.devsoland.drydrive.data.City
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
+import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.material3.CircularProgressIndicator // Добавьте, если еще нет
+import androidx.lifecycle.viewmodel.compose.viewModel // Для hiltViewModel()
+
 
 data class NavigationItem(val title: String)
 
 fun formatCityName(city: City): String {
     return "${city.name}, ${city.country}" + if (city.state != null) ", ${city.state}" else ""
 }
-
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -151,14 +155,23 @@ fun CitySearchDropDown(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DryDriveScreen(modifier: Modifier = Modifier) {
-    var weather by remember { mutableStateOf<Weather?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val apiKey = BuildConfig.WEATHER_API_KEY
-    val scope = rememberCoroutineScope()
+fun DryDriveScreen(
+    modifier: Modifier = Modifier,
+    viewModel: DryDriveViewModel = viewModel() // Получаем экземпляр ViewModel
+) {
+    // Собираем состояние из ViewModel
+    val weatherState by viewModel.weatherUiState.collectAsState()
+    val weather = weatherState.weather // Данные о погоде
+    val isLoadingWeather = weatherState.isLoading // Флаг загрузки
+    val errorMessage = weatherState.errorMessage // Сообщение об ошибке
+
+    // Эти состояния пока остаются в DryDriveScreen, т.к. они больше связаны с UI поиска
+    // Позже мы их тоже можем перенести в ViewModel или в отдельный UiState для поиска
     var cityForDisplay by remember { mutableStateOf("Moscow") }
     var selectedCityObject by remember { mutableStateOf<City?>(null) }
 
+
+    val scope = rememberCoroutineScope() // scope остается для действий, не связанных с ViewModel напрямую (например, Snackbar, Drawer)
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
@@ -167,39 +180,11 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
         NavigationItem("Карта"),
         NavigationItem("Настройки")
     )
-
     val selectedItem = remember { mutableStateOf(bottomMenuItems.first().title) }
 
     val carImage = when (weather?.weather?.getOrNull(0)?.main) {
         "Rain", "Snow", "Thunderstorm" -> painterResource(id = R.drawable.car_dirty)
         else -> painterResource(id = R.drawable.car_clean)
-    }
-
-    LaunchedEffect(key1 = selectedCityObject) {
-        selectedCityObject?.let { cityObj ->
-            // Запрос погоды теперь здесь, когда selectedCityObject изменяется (т.е. после выбора города)
-            scope.launch {
-                errorMessage = null
-                weather = null // Очищаем старую погоду перед новым запросом
-                Log.d("DryDriveScreen", "LAUNCHED_EFFECT: Fetching weather for: ${cityObj.name}")
-                try {
-                    val weatherApi = WeatherApi.create()
-                    val result = withContext(Dispatchers.IO) {
-                        weatherApi.getWeather(city = cityObj.name, apiKey = apiKey)
-                    }
-                    weather = result
-                    Log.d("DryDriveScreen", "LAUNCHED_EFFECT: Weather fetched for ${cityObj.name}: $result")
-                } catch (e: Exception) {
-                    val newErrorMessage = if (e.message?.contains("404") == true) {
-                        "Город не найден: ${cityObj.name}"
-                    } else {
-                        "Ошибка при загрузке погоды: ${e.message}"
-                    }
-                    errorMessage = newErrorMessage
-                    Log.e("DryDriveScreen", "LAUNCHED_EFFECT: Error fetching weather for ${cityObj.name}: ${e.message}", e)
-                }
-            }
-        }
     }
 
 
@@ -226,55 +211,9 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
     ) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                TopAppBar(
-                    title = { Text("DryDrive") },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = { scope.launch { drawerState.open() } }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu"
-                            )
-                        }
-                    }
-                )
-            },
-            bottomBar = {
-                NavigationBar {
-                    bottomMenuItems.forEach { screen ->
-                        NavigationBarItem(
-                            selected = screen.title == selectedItem.value,
-                            onClick = { selectedItem.value = screen.title },
-                            label = { Text(screen.title) },
-                            icon = {
-                                when (screen.title) {
-                                    "Главная" -> Icon(Icons.Default.Home, contentDescription = null)
-                                    "Карта" -> Icon(Icons.Default.Place, contentDescription = null)
-                                    "Настройки" -> Icon(Icons.Default.Settings, contentDescription = null)
-                                    else -> {}
-                                }
-                            }
-                        )
-                    }
-                }
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Кнопка нажата")
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add",
-                        tint = Color.White
-                    )
-                }
-            }
+            topBar = { /*... ваш код ...*/ },
+            bottomBar = { /*... ваш код ...*/ },
+            floatingActionButton = { /*... ваш код ...*/ }
         ) { paddingValues ->
             Box(
                 modifier = Modifier
@@ -300,21 +239,27 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CitySearchDropDown(
-                        weatherApi = WeatherApi.create(),
-                        apiKey = apiKey,
+                        // apiKey пока передаем, т.к. CitySearchDropDown его использует.
+                        // На следующем шаге мы перенесем и логику поиска городов в ViewModel.
+                        weatherApi = WeatherApi.create(), // <--- ПОКА ОСТАВЛЯЕМ ТАК, ИЗМЕНИМ НА СЛЕДУЮЩЕМ ШАГЕ
+                        apiKey = BuildConfig.WEATHER_API_KEY,  // <--- ПОКА ОСТАВЛЯЕМ ТАК
                         initialCityName = cityForDisplay,
                         onCitySelected = { city, formattedName ->
-                            selectedCityObject = city // Это вызовет LaunchedEffect для загрузки погоды
+                            selectedCityObject = city
                             cityForDisplay = formattedName
-                            // errorMessage = null // Убрано отсюда, так как LaunchedEffect сбросит
-                            Log.d("DryDriveScreen", "City selected: $formattedName, object: $city. Weather will be fetched by LaunchedEffect.")
+                            viewModel.clearErrorMessage() // Очищаем предыдущую ошибку погоды
+                            viewModel.fetchWeatherForCity(city) // Запрашиваем погоду через ViewModel
+                            Log.d("DryDriveScreen", "City selected: $formattedName, object: $city. Weather fetch initiated via ViewModel.")
                         },
                         modifier = Modifier.fillMaxWidth(0.8f),
                         onError = { errorMsg ->
+                            // Эта ошибка относится к поиску городов, ее обработка пока остается здесь
+                            // Позже объединим с errorMessage из ViewModel или сделаем отдельное состояние для ошибок поиска
                             if (errorMsg.isNotBlank()) {
-                                errorMessage = errorMsg
-                            } else if (errorMessage?.startsWith("Ошибка при поиске городов") == true || errorMessage?.startsWith("Города с таким названием не найдены") == true) {
-                                errorMessage = null
+                                // Тут нужно решить, как отображать ошибку поиска.
+                                // Пока можно использовать тот же snackbarHostState или отдельный Text.
+                                // Для простоты пока оставим как есть, но это кандидат на улучшение.
+                                scope.launch { snackbarHostState.showSnackbar("Ошибка поиска: $errorMsg") }
                             }
                             Log.d("DryDriveScreen", "onError from CitySearchDropDown: '$errorMsg'")
                         }
@@ -322,38 +267,25 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
 
                     Button(
                         onClick = {
-                            // selectedCityObject здесь точно не null, так как кнопка неактивна, если он null
                             selectedCityObject?.let { city ->
-                                scope.launch {
-                                    errorMessage = null // Сбрасываем ошибку перед новым запросом
-                                    weather = null // Опционально: сбрасываем старую погоду для индикации загрузки
-                                    Log.d("DryDriveScreen", "BUTTON_CLICK: Fetching weather for: ${city.name}")
-                                    try {
-                                        val weatherApi = WeatherApi.create()
-                                        val result = withContext(Dispatchers.IO) {
-                                            weatherApi.getWeather(city = city.name, apiKey = apiKey)
-                                        }
-                                        weather = result
-                                        Log.d("DryDriveScreen", "BUTTON_CLICK: Weather fetched: $result")
-                                    } catch (e: Exception) {
-                                        val newErrorMessage = if (e.message?.contains("404") == true) {
-                                            "Город не найден: ${city.name}"
-                                        } else {
-                                            "Ошибка при загрузке погоды: ${e.message}"
-                                        }
-                                        errorMessage = newErrorMessage
-                                        Log.e("DryDriveScreen", "BUTTON_CLICK: Error fetching weather for ${city.name}: ${e.message}", e)
-                                    }
-                                }
+                                viewModel.fetchWeatherForCity(city) // Запрашиваем погоду через ViewModel
+                                Log.d("DryDriveScreen", "BUTTON_CLICK: Fetch weather for ${city.name} via ViewModel.")
                             }
-                            // Если selectedCityObject будет null, кнопка будет неактивна,
-                            // поэтому блок else здесь не нужен.
+                            // Если selectedCityObject null, кнопка неактивна, так что else не нужен
                         },
                         modifier = Modifier.padding(top = 16.dp),
-                        enabled = selectedCityObject != null // Кнопка активна ТОЛЬКО если город выбран
+                        enabled = selectedCityObject != null && !isLoadingWeather // Делаем кнопку неактивной и во время загрузки
                     ) {
-                        // Текст кнопки теперь более точно отражает её действие
-                        Text(if (weather != null && selectedCityObject?.name == weather?.name) "Обновить погоду" else "Узнать погоду")
+                        Text(
+                            if (isLoadingWeather) "Загрузка..."
+                            else if (weather != null && selectedCityObject?.name == weather.name) "Обновить погоду"
+                            else "Узнать погоду"
+                        )
+                    }
+
+                    // Отображение индикатора загрузки погоды
+                    if (isLoadingWeather) {
+                        CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
                     }
 
                     Image(
@@ -365,8 +297,9 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                         contentScale = ContentScale.Fit
                     )
 
+                    // Отображение данных о погоде или ошибки
                     AnimatedVisibility(
-                        visible = weather != null && (errorMessage == null || errorMessage!!.isBlank()),
+                        visible = !isLoadingWeather && weather != null && errorMessage == null, // Показываем, если нет загрузки, есть погода и нет ошибки
                         enter = fadeIn(tween(500)),
                         exit = fadeOut()
                     ) {
@@ -407,9 +340,10 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                         }
                     }
 
-                    if (!errorMessage.isNullOrBlank()) {
+                    // Отображение ошибки загрузки погоды
+                    if (!isLoadingWeather && errorMessage != null) {
                         Text(
-                            text = errorMessage!!,
+                            text = errorMessage, // Ошибка из ViewModel
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(top = 16.dp)
                         )
