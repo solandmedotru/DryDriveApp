@@ -68,6 +68,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3") // Обновлено
     implementation("androidx.activity:activity-compose:1.11.0") // Последняя версия
 
+    //Иконки
+    implementation("androidx.compose.material:material-icons-core:1.7.8") // Основные иконки (обычно уже есть как транзитивная)
+    implementation("androidx.compose.material:material-icons-extended:1.7.8") // Расширенный набор
+
+
     // Jetpack Compose
     implementation("androidx.compose.ui:ui:1.9.1") // Последняя версия
     implementation("androidx.compose.material3:material3:1.3.2") // Последняя версия

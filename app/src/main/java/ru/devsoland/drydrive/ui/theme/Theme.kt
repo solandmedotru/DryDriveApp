@@ -9,12 +9,21 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
-    tertiary = Pink80
+    tertiary = Pink80,
+    background = DarkColorSchemeBackground, // <--- ИСПОЛЬЗУЕМ ВАШ ЦВЕТ
+    surface = Color(0xFF2C2E32), // Поверхность тоже можно сделать темной, но чуть светлее фона
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.Black,
+    onBackground = Color(0xFFE5E5E5), // Текст на темном фоне
+    onSurface = Color(0xFFE5E5E5)    // Текст на поверхности
+    // ... другие цвета по необходимости
 )
 
 private val LightColorScheme = lightColorScheme(
