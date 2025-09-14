@@ -3,7 +3,9 @@ package ru.devsoland.drydrive
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -18,6 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
@@ -29,6 +34,7 @@ import kotlinx.coroutines.withContext
 import ru.devsoland.drydrive.data.Weather
 import ru.devsoland.drydrive.data.WeatherApi
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
+import androidx.compose.foundation.Image
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,60 +59,96 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
     val apiKey = BuildConfig.WEATHER_API_KEY
     val scope = rememberCoroutineScope()
 
-    Column(
+    // Placeholder для фона (замени на твою картинку)
+    val backgroundImage = painterResource(id = R.drawable.city_background) // Заглушка
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "Welcome to DryDrive!",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center
+        // Фоновое изображение
+        Image(
+            painter = backgroundImage,
+            contentDescription = "City Background",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
-        Text(
-            text = "Check the weather to keep your car clean",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Button(
-            onClick = {
-                scope.launch {
-                    try {
-                        val weatherApi = WeatherApi.create()
-                        val result = withContext(Dispatchers.IO) {
-                            weatherApi.getWeather(apiKey = apiKey)
-                        }
-                        weather = result
-                        Log.d("DryDrive", "Weather fetched: $result")
-                    } catch (e: Exception) {
-                        errorMessage = "Error: ${e.message}"
-                        Log.e("DryDrive", "Error fetching weather: ${e.message}", e)
-                    }
-                }
-            },
-            modifier = Modifier.padding(top = 16.dp)
+
+        // UI поверх фона с полупрозрачным наложением
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)) // Полупрозрачный фон для текста
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Text(text = "Get Weather")
-        }
-        weather?.let { w ->
-            val recommendation = if (w.weather[0].main == "Rain") "Не мойте машину: дождь" else "Можно мыть машину"
             Text(
-                text = "Temp: ${w.main.temp}°C, ${w.weather[0].description}\n$recommendation",
+                text = "Welcome to DryDrive!",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Check the weather to keep your car clean",
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(top = 16.dp)
+                color = MaterialTheme.colorScheme.onPrimary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp)
             )
-        }
-        errorMessage?.let { msg ->
-            Text(
-                text = msg,
-                color = MaterialTheme.colorScheme.error,
+            Button(
+                onClick = {
+                    scope.launch {
+                        try {
+                            val weatherApi = WeatherApi.create()
+                            val result = withContext(Dispatchers.IO) {
+                                weatherApi.getWeather(apiKey = apiKey)
+                            }
+                            weather = result
+                            Log.d("DryDrive", "Weather fetched: $result")
+                        } catch (e: Exception) {
+                            errorMessage = "Error: ${e.message}"
+                            Log.e("DryDrive", "Error fetching weather: ${e.message}", e)
+                        }
+                    }
+                },
                 modifier = Modifier.padding(top = 16.dp)
-            )
+            ) {
+                Text(text = "Get Weather", color = MaterialTheme.colorScheme.onPrimary)
+            }
+            weather?.let { w ->
+                val recommendation = when (w.weather[0].main) {
+                    "Rain" -> "Не мойте машину: дождь"
+                    "Snow" -> "Не мойте машину: снег"
+                    "Mist", "Fog" -> "Не мойте машину: туман"
+                    "Thunderstorm" -> "Не мойте машину: гроза"
+                    else -> "Можно мыть машину"
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "${w.name}", // Название города
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                    Text(
+                        text = "Temp: ${w.main.temp}°C, ${w.weather[0].description}\n$recommendation",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+            errorMessage?.let { msg ->
+                Text(
+                    text = msg,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
         }
     }
 }

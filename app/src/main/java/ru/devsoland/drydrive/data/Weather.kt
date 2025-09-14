@@ -1,19 +1,13 @@
 package ru.devsoland.drydrive.data
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 
 @Serializable
 data class Weather(
     val name: String, // Название города
-    val coord: Coord, // Координаты
     val main: Main,
     val weather: List<WeatherInfo>
-)
-
-@Serializable
-data class Coord(
-    val lon: Double, // Долгота
-    val lat: Double  // Широта
 )
 
 @Serializable
@@ -22,7 +16,8 @@ data class Main(
 )
 
 @Serializable
+@JsonIgnoreUnknownKeys // Игнорировать неизвестные ключи в WeatherInfo
 data class WeatherInfo(
-    val description: String, // Описание погоды (например, "light rain")
-    val main: String // Основной тип погоды (например, "Rain")
+    val description: String, // Описание погоды
+    val main: String // Основной тип погоды
 )
