@@ -14,33 +14,36 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.devsoland.drydrive.data.Weather
 import ru.devsoland.drydrive.data.WeatherApi
+import ru.devsoland.drydrive.data.City
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
 
 data class NavigationItem(val title: String)
+
+fun formatCityName(city: City): String {
+    return "${city.name}, ${city.country}" + if (city.state != null) ", ${city.state}" else ""
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,17 +63,105 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun CitySearchDropDown(
+    weatherApi: WeatherApi,
+    apiKey: String,
+    initialCityName: String,
+    onCitySelected: (City, String) -> Unit,
+    modifier: Modifier = Modifier,
+    onError: (String) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf(initialCityName) }
+    var cities by remember { mutableStateOf<List<City>>(emptyList()) }
+    var expanded by remember { mutableStateOf(false) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { query ->
+                searchQuery = query
+                expanded = query.isNotEmpty()
+                searchJob?.cancel()
+                Log.d("CitySearch", "Query changed to: '$query'. Previous job cancelled if active.")
+
+                if (query.length > 2) {
+                    searchJob = coroutineScope.launch {
+                        Log.d("CitySearch", "Starting search coroutine for: '$query'")
+                        delay(500)
+                        try {
+                            Log.d("CitySearch", "Executing API call for: '$query'")
+                            val results = withContext(Dispatchers.IO) {
+                                weatherApi.searchCities(query = query, apiKey = apiKey)
+                            }
+                            Log.d("CitySearch", "Received ${results.size} cities for: '$query'. Results: $results")
+                            cities = results
+                            if (results.isEmpty() && query.isNotBlank()) {
+                                onError("Города с таким названием не найдены: '$query'")
+                            } else if (results.isNotEmpty()) {
+                                onError("") // Очищаем ошибку если города найдены
+                            }
+                        } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) {
+                                Log.w("CitySearch", "Search for '$query' was cancelled.")
+                            } else {
+                                Log.e("CitySearch", "Error searching cities for '$query': ${e.message}", e)
+                                onError("Ошибка при поиске городов: ${e.message}")
+                                cities = emptyList()
+                            }
+                        }
+                    }
+                } else {
+                    cities = emptyList()
+                    if (query.isEmpty()) {
+                        expanded = false
+                        onError("")
+                    }
+                    Log.d("CitySearch", "Query '$query' is too short or empty, clearing/hiding cities list.")
+                }
+            },
+            label = { Text("Введите город") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        DropdownMenu(
+            expanded = expanded && cities.isNotEmpty(),
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            cities.forEach { city ->
+                DropdownMenuItem(
+                    text = { Text(formatCityName(city)) },
+                    onClick = {
+                        val formattedName = formatCityName(city)
+                        searchQuery = formattedName
+                        onCitySelected(city, formattedName)
+                        expanded = false
+                        cities = emptyList()
+                        Log.d("CitySearch", "City selected: ${formatCityName(city)}")
+                    }
+                )
+            }
+        }
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun DryDriveScreen(modifier: Modifier = Modifier) {
     var weather by remember { mutableStateOf<Weather?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val apiKey = BuildConfig.WEATHER_API_KEY
     val scope = rememberCoroutineScope()
-    var city by remember { mutableStateOf("Moscow") }
+    var cityForDisplay by remember { mutableStateOf("Moscow") }
+    var selectedCityObject by remember { mutableStateOf<City?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-    // Элементы нижней навигации
     val bottomMenuItems = listOf(
         NavigationItem("Главная"),
         NavigationItem("Карта"),
@@ -79,11 +170,38 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
 
     val selectedItem = remember { mutableStateOf(bottomMenuItems.first().title) }
 
-    // Фоновая картинка автомобиля
     val carImage = when (weather?.weather?.getOrNull(0)?.main) {
         "Rain", "Snow", "Thunderstorm" -> painterResource(id = R.drawable.car_dirty)
         else -> painterResource(id = R.drawable.car_clean)
     }
+
+    LaunchedEffect(key1 = selectedCityObject) {
+        selectedCityObject?.let { cityObj ->
+            // Запрос погоды теперь здесь, когда selectedCityObject изменяется (т.е. после выбора города)
+            scope.launch {
+                errorMessage = null
+                weather = null // Очищаем старую погоду перед новым запросом
+                Log.d("DryDriveScreen", "LAUNCHED_EFFECT: Fetching weather for: ${cityObj.name}")
+                try {
+                    val weatherApi = WeatherApi.create()
+                    val result = withContext(Dispatchers.IO) {
+                        weatherApi.getWeather(city = cityObj.name, apiKey = apiKey)
+                    }
+                    weather = result
+                    Log.d("DryDriveScreen", "LAUNCHED_EFFECT: Weather fetched for ${cityObj.name}: $result")
+                } catch (e: Exception) {
+                    val newErrorMessage = if (e.message?.contains("404") == true) {
+                        "Город не найден: ${cityObj.name}"
+                    } else {
+                        "Ошибка при загрузке погоды: ${e.message}"
+                    }
+                    errorMessage = newErrorMessage
+                    Log.e("DryDriveScreen", "LAUNCHED_EFFECT: Error fetching weather for ${cityObj.name}: ${e.message}", e)
+                }
+            }
+        }
+    }
+
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -163,7 +281,6 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // Фоновое изображение города
                 Image(
                     painter = painterResource(id = R.drawable.city_background),
                     contentDescription = "City Background",
@@ -182,39 +299,63 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Поле ввода города
-                    OutlinedTextField(
-                        value = city,
-                        onValueChange = { city = it },
-                        label = { Text("Введите город") },
-                        modifier = Modifier.fillMaxWidth(0.7f)
+                    CitySearchDropDown(
+                        weatherApi = WeatherApi.create(),
+                        apiKey = apiKey,
+                        initialCityName = cityForDisplay,
+                        onCitySelected = { city, formattedName ->
+                            selectedCityObject = city // Это вызовет LaunchedEffect для загрузки погоды
+                            cityForDisplay = formattedName
+                            // errorMessage = null // Убрано отсюда, так как LaunchedEffect сбросит
+                            Log.d("DryDriveScreen", "City selected: $formattedName, object: $city. Weather will be fetched by LaunchedEffect.")
+                        },
+                        modifier = Modifier.fillMaxWidth(0.8f),
+                        onError = { errorMsg ->
+                            if (errorMsg.isNotBlank()) {
+                                errorMessage = errorMsg
+                            } else if (errorMessage?.startsWith("Ошибка при поиске городов") == true || errorMessage?.startsWith("Города с таким названием не найдены") == true) {
+                                errorMessage = null
+                            }
+                            Log.d("DryDriveScreen", "onError from CitySearchDropDown: '$errorMsg'")
+                        }
                     )
+
                     Button(
                         onClick = {
-                            scope.launch {
-                                try {
-                                    val weatherApi = WeatherApi.create()
-                                    val result = withContext(Dispatchers.IO) {
-                                        weatherApi.getWeather(city = city.trim(), apiKey = apiKey)
+                            // selectedCityObject здесь точно не null, так как кнопка неактивна, если он null
+                            selectedCityObject?.let { city ->
+                                scope.launch {
+                                    errorMessage = null // Сбрасываем ошибку перед новым запросом
+                                    weather = null // Опционально: сбрасываем старую погоду для индикации загрузки
+                                    Log.d("DryDriveScreen", "BUTTON_CLICK: Fetching weather for: ${city.name}")
+                                    try {
+                                        val weatherApi = WeatherApi.create()
+                                        val result = withContext(Dispatchers.IO) {
+                                            weatherApi.getWeather(city = city.name, apiKey = apiKey)
+                                        }
+                                        weather = result
+                                        Log.d("DryDriveScreen", "BUTTON_CLICK: Weather fetched: $result")
+                                    } catch (e: Exception) {
+                                        val newErrorMessage = if (e.message?.contains("404") == true) {
+                                            "Город не найден: ${city.name}"
+                                        } else {
+                                            "Ошибка при загрузке погоды: ${e.message}"
+                                        }
+                                        errorMessage = newErrorMessage
+                                        Log.e("DryDriveScreen", "BUTTON_CLICK: Error fetching weather for ${city.name}: ${e.message}", e)
                                     }
-                                    weather = result
-                                    Log.d("DryDrive", "Weather fetched: $result")
-                                } catch (e: Exception) {
-                                    errorMessage = if (e.message?.contains("404") == true) {
-                                        "Город не найден: проверьте название"
-                                    } else {
-                                        "Ошибка: ${e.message}"
-                                    }
-                                    Log.e("DryDrive", "Error fetching weather: ${e.message}", e)
                                 }
                             }
+                            // Если selectedCityObject будет null, кнопка будет неактивна,
+                            // поэтому блок else здесь не нужен.
                         },
-                        modifier = Modifier.padding(top = 16.dp)
+                        modifier = Modifier.padding(top = 16.dp),
+                        enabled = selectedCityObject != null // Кнопка активна ТОЛЬКО если город выбран
                     ) {
-                        Text("Узнать погоду")
+                        // Текст кнопки теперь более точно отражает её действие
+                        Text(if (weather != null && selectedCityObject?.name == weather?.name) "Обновить погоду" else "Узнать погоду")
                     }
 
-                    // Изображение автомобиля
                     Image(
                         painter = carImage,
                         contentDescription = "Car Image",
@@ -224,23 +365,22 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                         contentScale = ContentScale.Fit
                     )
 
-                    // Карточка с погодой
                     AnimatedVisibility(
-                        visible = weather != null,
+                        visible = weather != null && (errorMessage == null || errorMessage!!.isBlank()),
                         enter = fadeIn(tween(500)),
                         exit = fadeOut()
                     ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .clip(RoundedCornerShape(16.dp))
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                        weather?.let { w ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.9f)
+                                    .clip(RoundedCornerShape(16.dp))
                             ) {
-                                weather?.let { w ->
-                                    val recommendation = when (w.weather[0].main) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val recommendation = when (w.weather.getOrNull(0)?.main) {
                                         "Rain" -> "Мыть не стоит: дождь"
                                         "Snow" -> "Мыть не стоит: снег"
                                         "Mist", "Fog" -> "Мыть не стоит: туман"
@@ -252,7 +392,7 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                                         style = MaterialTheme.typography.headlineMedium
                                     )
                                     Text(
-                                        text = w.weather[0].description,
+                                        text = w.weather.getOrNull(0)?.description ?: "Нет данных",
                                         style = MaterialTheme.typography.titleMedium,
                                         modifier = Modifier.padding(top = 8.dp)
                                     )
@@ -267,16 +407,14 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                         }
                     }
 
-                    // Ошибки
-                    errorMessage?.let { msg ->
+                    if (!errorMessage.isNullOrBlank()) {
                         Text(
-                            text = msg,
+                            text = errorMessage!!,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(top = 16.dp)
                         )
                     }
 
-                    // Заглушка прогноза
                     LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()

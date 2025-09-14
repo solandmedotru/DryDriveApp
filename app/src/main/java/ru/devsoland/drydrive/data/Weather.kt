@@ -24,6 +24,9 @@ data class WeatherInfo(
 
 @Serializable
 data class City(
-    val name: String, // Название города
-    val country: String // Код страны
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+    val country: String,
+    val state: String? = null // Поле state может отсутствовать
 )
