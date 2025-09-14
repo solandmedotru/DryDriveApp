@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,9 +59,10 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val apiKey = BuildConfig.WEATHER_API_KEY
     val scope = rememberCoroutineScope()
+    var city by remember { mutableStateOf("Moscow") } // Значение города по умолчанию
 
-    // Placeholder для фона (замени на твою картинку)
-    val backgroundImage = painterResource(id = R.drawable.city_background) // Заглушка
+    // Фоновая картинка
+    val backgroundImage = painterResource(id = R.drawable.city_background)
 
     Box(
         modifier = modifier
@@ -96,18 +98,27 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp)
             )
+            OutlinedTextField(
+                value = city,
+                onValueChange = { city = it },
+                label = { Text("Enter city", color = MaterialTheme.colorScheme.onPrimary) },
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .align(Alignment.CenterHorizontally),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onPrimary)
+            )
             Button(
                 onClick = {
                     scope.launch {
                         try {
                             val weatherApi = WeatherApi.create()
                             val result = withContext(Dispatchers.IO) {
-                                weatherApi.getWeather(apiKey = apiKey)
+                                weatherApi.getWeather(city = city.trim(), apiKey = apiKey) // Удаляем лишние пробелы
                             }
                             weather = result
                             Log.d("DryDrive", "Weather fetched: $result")
                         } catch (e: Exception) {
-                            errorMessage = "Error: ${e.message}"
+                            errorMessage = if (e.message?.contains("404") == true) "Город не найден: проверьте название" else "Error: ${e.message}"
                             Log.e("DryDrive", "Error fetching weather: ${e.message}", e)
                         }
                     }

@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 interface WeatherApi {
     @GET("data/2.5/weather")
     suspend fun getWeather(
-        @Query("q") city: String = "Moscow", // Город по умолчанию
+        @Query("q") city: String = "Moscow", // Город как параметр
         @Query("appid") apiKey: String,
         @Query("units") units: String = "metric" // Температура в °C
     ): Weather
@@ -23,9 +23,7 @@ interface WeatherApi {
 
         fun create(): WeatherApi {
             val json = Json {
-                ignoreUnknownKeys = true // Игнорировать неизвестные ключи на всех уровнях
-                isLenient = false // Оставляем строгую проверку, если не нужно
-                coerceInputValues = false // Не преобразовывать значения автоматически
+                ignoreUnknownKeys = true
             }
             val client = OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
