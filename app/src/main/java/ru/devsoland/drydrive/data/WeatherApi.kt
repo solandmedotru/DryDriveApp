@@ -7,7 +7,6 @@ import retrofit2.Retrofit
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory // Corrected import
 import retrofit2.http.GET
 import retrofit2.http.Query
-import kotlinx.coroutines.Deferred // Consider using suspend fun instead of Deferred
 import java.util.concurrent.TimeUnit
 
 interface WeatherApi {
@@ -17,6 +16,13 @@ interface WeatherApi {
         @Query("appid") apiKey: String,
         @Query("units") units: String = "metric" // Температура в °C
     ): Weather
+
+    @GET("geo/1.0/direct")
+    suspend fun searchCities(
+        @Query("q") query: String, // Поисковый запрос (название города)
+        @Query("limit") limit: Int = 5, // Ограничение результатов
+        @Query("appid") apiKey: String
+    ): List<City> // Список городов
 
     companion object {
         private const val BASE_URL = "https://api.openweathermap.org/"

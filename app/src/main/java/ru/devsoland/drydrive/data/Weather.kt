@@ -21,3 +21,9 @@ data class WeatherInfo(
     val description: String, // Описание погоды
     val main: String // Основной тип погоды
 )
+
+@Serializable
+data class City(
+    val name: String, // Название города
+    val country: String // Код страны
+)

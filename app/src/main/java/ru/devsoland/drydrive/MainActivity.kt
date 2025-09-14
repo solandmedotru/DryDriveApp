@@ -4,10 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -27,11 +30,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ru.devsoland.drydrive.data.City
 import ru.devsoland.drydrive.data.Weather
 import ru.devsoland.drydrive.data.WeatherApi
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
@@ -59,10 +64,33 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val apiKey = BuildConfig.WEATHER_API_KEY
     val scope = rememberCoroutineScope()
-    var city by remember { mutableStateOf("Moscow") } // Значение города по умолчанию
+    var city by remember { mutableStateOf("Moscow") }
+    var cities by remember { mutableStateOf<List<City>>(emptyList()) } // Список предложений
 
     // Фоновая картинка
     val backgroundImage = painterResource(id = R.drawable.city_background)
+
+    // Moved LaunchedEffect here
+    if (city.length > 2) {
+        LaunchedEffect(city) { // Keyed to 'city' state
+            scope.launch {
+                try {
+                    val weatherApi = WeatherApi.create()
+                    cities = withContext(Dispatchers.IO) {
+                        weatherApi.searchCities(query = city, apiKey = apiKey) // Use the current 'city' state
+                    }
+                } catch (e: Exception) {
+                    Log.e("DryDrive", "Error searching cities: ${e.message}")
+                    cities = emptyList()
+                }
+            }
+        }
+    } else if (cities.isNotEmpty()){ // Clear suggestions if city length is <= 2
+        LaunchedEffect(Unit) { // Or LaunchedEffect(city.length <=2)
+            cities = emptyList()
+        }
+    }
+
 
     Box(
         modifier = modifier
@@ -76,11 +104,11 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
             contentScale = ContentScale.Crop
         )
 
-        // UI поверх фона с полупрозрачным наложением
+        // UI поверх фона
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)) // Полупрозрачный фон для текста
+                .background(Color.Black.copy(alpha = 0.5f))
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -100,20 +128,40 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
             )
             OutlinedTextField(
                 value = city,
-                onValueChange = { city = it },
+                onValueChange = { newCity ->
+                    city = newCity
+                    // The LaunchedEffect that was here is now outside
+                },
                 label = { Text("Enter city", color = MaterialTheme.colorScheme.onPrimary) },
                 modifier = Modifier
                     .padding(top = 16.dp)
                     .align(Alignment.CenterHorizontally),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onPrimary)
             )
+            // Список предложений городов
+            cities.take(5).forEach { suggestion ->
+                Text(
+                    text = "${suggestion.name}, ${suggestion.country}",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
+                        .clickable {
+                            city = suggestion.name
+                            cities = emptyList() // Скрыть список
+                        }
+                        .padding(8.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
             Button(
                 onClick = {
+                    cities = emptyList() // Скрыть список
                     scope.launch {
                         try {
                             val weatherApi = WeatherApi.create()
                             val result = withContext(Dispatchers.IO) {
-                                weatherApi.getWeather(city = city.trim(), apiKey = apiKey) // Удаляем лишние пробелы
+                                weatherApi.getWeather(city = city.trim(), apiKey = apiKey)
                             }
                             weather = result
                             Log.d("DryDrive", "Weather fetched: $result")
@@ -139,7 +187,7 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "${w.name}", // Название города
+                        text = "${w.name}",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onPrimary,
                         textAlign = TextAlign.Center,
@@ -161,13 +209,5 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                 )
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DryDriveScreenPreview() {
-    DryDriveTheme {
-        DryDriveScreen()
     }
 }
