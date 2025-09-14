@@ -21,18 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.runtime.LaunchedEffect
-import android.util.Log
-import androidx.activity.result.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.devsoland.drydrive.data.Weather
 import ru.devsoland.drydrive.data.WeatherApi
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
-import androidx.compose.runtime.rememberCoroutineScope // Import this
-import kotlinx.coroutines.launch // Import this
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,25 +51,7 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
     var weather by remember { mutableStateOf<Weather?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val apiKey = BuildConfig.WEATHER_API_KEY
-    val scope = rememberCoroutineScope() // Create a CoroutineScope
-
-    // Initial weather fetch
-    LaunchedEffect(Unit) {
-        try {
-            val weatherApi = WeatherApi.create()
-            // No .await() needed if getWeather is a suspend function
-            val result = withContext(Dispatchers.IO) {
-                Log.e("DryDrive", "APIKEY: $apiKey")
-                Log.d("DryDrive", "API Key from BuildConfig: ${BuildConfig.WEATHER_API_KEY}")
-                weatherApi.getWeather(apiKey = apiKey)
-            }
-            weather = result
-            Log.d("DryDrive", "Weather fetched: $result")
-        } catch (e: Exception) {
-            errorMessage = "Error: ${e.message}"
-            Log.e("DryDrive", "Error fetching weather: ${e.message}", e)
-        }
-    }
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = modifier
@@ -97,17 +75,17 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
         )
         Button(
             onClick = {
-                // Relaunch the request on click using the scope
                 scope.launch {
                     try {
-                        errorMessage = null
                         val weatherApi = WeatherApi.create()
                         val result = withContext(Dispatchers.IO) {
-                            weatherApi.getWeather(apiKey = apiKey) // No .await()
+                            weatherApi.getWeather(apiKey = apiKey)
                         }
                         weather = result
-                        Log.d("DryDrive", "Weather fetched on click: $result")} catch (e: Exception) {
-                        // ...
+                        Log.d("DryDrive", "Weather fetched: $result")
+                    } catch (e: Exception) {
+                        errorMessage = "Error: ${e.message}"
+                        Log.e("DryDrive", "Error fetching weather: ${e.message}", e)
                     }
                 }
             },
@@ -116,8 +94,9 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
             Text(text = "Get Weather")
         }
         weather?.let { w ->
+            val recommendation = if (w.weather[0].main == "Rain") "Не мойте машину: дождь" else "Можно мыть машину"
             Text(
-                text = "Temp: ${w.main.temp}°C, ${w.weather[0].description}",
+                text = "Temp: ${w.main.temp}°C, ${w.weather[0].description}\n$recommendation",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = 16.dp)
             )
@@ -129,5 +108,13 @@ fun DryDriveScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 16.dp)
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun DryDriveScreenPreview() {
+    DryDriveTheme {
+        DryDriveScreen()
     }
 }
