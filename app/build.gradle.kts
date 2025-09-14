@@ -73,9 +73,10 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling-data:1.9.1") // Добавлено для улучшенного превью
 
     // Retrofit + OkHttp + Serialization
-    implementation("com.squareup.retrofit2:retrofit:3.0.0") // Последняя версия
-    implementation("com.squareup.okhttp3:okhttp:5.1.0") // Последняя версия
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0") // Обновлено
+    implementation("com.squareup.retrofit2:retrofit:3.0.0")
+    implementation("com.squareup.okhttp3:okhttp:5.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
 
     // Room
     implementation("androidx.room:room-runtime:2.8.0") // Последняя версия
