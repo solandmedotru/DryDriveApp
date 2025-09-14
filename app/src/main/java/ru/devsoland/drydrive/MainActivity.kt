@@ -40,7 +40,16 @@ import ru.devsoland.drydrive.data.City
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.material3.CircularProgressIndicator // Добавьте, если еще нет
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel // Для hiltViewModel()
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+// import androidx.compose.ui.unit.sp // Уже есть выше
+import java.util.Locale // Для titlecase
+import ru.devsoland.drydrive.ui.DisplayDayWeather // <--- ДОБАВЬТЕ ЭТОТ ИМПОРТ (тот же путь, что и в ViewModel)
 
 
 data class NavigationItem(val title: String)
@@ -48,7 +57,7 @@ data class NavigationItem(val title: String)
 fun formatCityName(city: City): String {
     return "${city.name}, ${city.country}" + if (city.state != null) ", ${city.state}" else ""
 }
-@AndroidEntryPoint
+@AndroidEntryPoint // <--- ДОБАВИТЬ ЭТУ АННОТАЦИЮ
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,74 +74,72 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CitySearchDropDown(
-    weatherApi: WeatherApi,
-    apiKey: String,
-    initialCityName: String,
+fun CitySearchDropDown( // Параметры остаются такими же, как на предыдущем шаге
+    searchQuery: String,
+    onQueryChange: (String) -> Unit,
+    cities: List<City>,
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
     onCitySelected: (City, String) -> Unit,
     modifier: Modifier = Modifier,
-    onError: (String) -> Unit
+    isLoading: Boolean,
+    errorMessage: String?
 ) {
-    var searchQuery by remember { mutableStateOf(initialCityName) }
-    var cities by remember { mutableStateOf<List<City>>(emptyList()) }
-    var expanded by remember { mutableStateOf(false) }
-    var searchJob by remember { mutableStateOf<Job?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-
     Box(modifier = modifier) {
         OutlinedTextField(
             value = searchQuery,
-            onValueChange = { query ->
-                searchQuery = query
-                expanded = query.isNotEmpty()
-                searchJob?.cancel()
-                Log.d("CitySearch", "Query changed to: '$query'. Previous job cancelled if active.")
-
-                if (query.length > 2) {
-                    searchJob = coroutineScope.launch {
-                        Log.d("CitySearch", "Starting search coroutine for: '$query'")
-                        delay(500)
-                        try {
-                            Log.d("CitySearch", "Executing API call for: '$query'")
-                            val results = withContext(Dispatchers.IO) {
-                                weatherApi.searchCities(query = query, apiKey = apiKey)
-                            }
-                            Log.d("CitySearch", "Received ${results.size} cities for: '$query'. Results: $results")
-                            cities = results
-                            if (results.isEmpty() && query.isNotBlank()) {
-                                onError("Города с таким названием не найдены: '$query'")
-                            } else if (results.isNotEmpty()) {
-                                onError("") // Очищаем ошибку если города найдены
-                            }
-                        } catch (e: Exception) {
-                            if (e is kotlinx.coroutines.CancellationException) {
-                                Log.w("CitySearch", "Search for '$query' was cancelled.")
-                            } else {
-                                Log.e("CitySearch", "Error searching cities for '$query': ${e.message}", e)
-                                onError("Ошибка при поиске городов: ${e.message}")
-                                cities = emptyList()
-                            }
-                        }
-                    }
-                } else {
-                    cities = emptyList()
-                    if (query.isEmpty()) {
-                        expanded = false
-                        onError("")
-                    }
-                    Log.d("CitySearch", "Query '$query' is too short or empty, clearing/hiding cities list.")
+            onValueChange = onQueryChange,
+            label = { Text("Введите город", color = Color.White.copy(alpha = 0.7f)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            trailingIcon = {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 }
             },
-            label = { Text("Введите город") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            isError = errorMessage != null,
+            colors = OutlinedTextFieldDefaults.colors(
+                // Стилизация для темного фона
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White.copy(alpha = 0.9f),
+                cursorColor = Color.White,
+                focusedBorderColor = Color.White,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                focusedLabelColor = Color.White,
+                unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
+                errorBorderColor = MaterialTheme.colorScheme.error,
+                errorLabelColor = MaterialTheme.colorScheme.error,
+                errorTextColor = MaterialTheme.colorScheme.error,
+                disabledTextColor = Color.White.copy(alpha = 0.5f),
+                disabledBorderColor = Color.White.copy(alpha = 0.3f),
+                disabledLabelColor = Color.White.copy(alpha = 0.5f),
+                // Фоны можно сделать прозрачными или полупрозрачными, если нужно
+                // focusedContainerColor = Color.Transparent,
+                // unfocusedContainerColor = Color.Transparent,
+                // disabledContainerColor = Color.Transparent,
+                // errorContainerColor = Color.Transparent
+            )
         )
+
+
+        // Отображение сообщения об ошибке поиска под полем ввода
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .padding(start = 16.dp, top = 4.dp)
+                    .align(Alignment.BottomStart)
+            )
+        }
 
         DropdownMenu(
             expanded = expanded && cities.isNotEmpty(),
-            onDismissRequest = { expanded = false },
+            onDismissRequest = onDismissRequest,
             modifier = Modifier.fillMaxWidth()
         ) {
             cities.forEach { city ->
@@ -140,11 +147,7 @@ fun CitySearchDropDown(
                     text = { Text(formatCityName(city)) },
                     onClick = {
                         val formattedName = formatCityName(city)
-                        searchQuery = formattedName
                         onCitySelected(city, formattedName)
-                        expanded = false
-                        cities = emptyList()
-                        Log.d("CitySearch", "City selected: ${formatCityName(city)}")
                     }
                 )
             }
@@ -152,252 +155,290 @@ fun CitySearchDropDown(
     }
 }
 
+@Composable
+fun WeatherDetails(weather: Weather?) {
+    weather?.let { w ->
+        val weatherDescription = w.weather.getOrNull(0)?.description?.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+        } ?: "Нет данных"
+
+        val recommendation = when (w.weather.getOrNull(0)?.main) {
+            "Rain" -> "Сегодня дождь. Лучше остаться дома!"
+            "Snow" -> "Идет снег! Время для зимних забав."
+            "Mist", "Fog" -> "Туманно. Будьте осторожны на дорогах."
+            "Thunderstorm" -> "Гроза! Не забудьте зонт."
+            else -> "Отличный день для мойки! Дождя не предвидится."
+        }
+
+        Column(
+            horizontalAlignment = Alignment.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "${w.main.temp.toInt()}°C",
+                style = TextStyle(
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            )
+            Text(
+                text = weatherDescription,
+                style = TextStyle(
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = Color.White
+                ),
+                modifier = Modifier.padding(top = 0.dp, bottom = 8.dp)
+            )
+            Text(
+                text = recommendation,
+                style = TextStyle(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            )
+        }
+    }
+}
+
+
+
+@Composable
+fun DailyForecastRow(forecasts: List<DisplayDayWeather>) { // Принимает List<DisplayDayWeather>
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 0.dp) // В примере карточки идут от края до края
+    ) {
+        itemsIndexed(forecasts) { index, dayWeather ->
+            ForecastDayCard(
+                dayWeather = dayWeather,
+                isCurrentDay = dayWeather.dayShort == "Сейчас" || index == 0
+            )
+        }
+    }
+}
+
+@Composable
+fun ForecastDayCard(dayWeather: DisplayDayWeather, isCurrentDay: Boolean) {
+    val backgroundColor = if (isCurrentDay) {
+        Color(0xFF0095FF) // Яркий синий для текущего дня
+    } else {
+        Color.Black.copy(alpha = 0.2f) // Полупрозрачный темный для остальных, как в примере
+        // или Color.Transparent, если фон под ними должен быть виден без затемнения
+    }
+    val contentColor = Color.White
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        modifier = Modifier
+            .width(80.dp) // Фиксированная ширина карточки
+            .height(120.dp) // Фиксированная высота карточки
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 16.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = dayWeather.dayShort,
+                style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, color = contentColor)
+            )
+            Icon(
+                painter = painterResource(id = dayWeather.iconRes),
+                contentDescription = null, // Можно добавить описание на основе погоды
+                tint = contentColor,
+                modifier = Modifier.size(36.dp)
+            )
+            Text(
+                text = dayWeather.temperature,
+                style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, color = contentColor)
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DryDriveScreen(
     modifier: Modifier = Modifier,
-    viewModel: DryDriveViewModel = viewModel() // Получаем экземпляр ViewModel
+    viewModel: DryDriveViewModel = viewModel()
 ) {
-    // Собираем состояние из ViewModel
-    val weatherState by viewModel.weatherUiState.collectAsState()
-    val weather = weatherState.weather // Данные о погоде
-    val isLoadingWeather = weatherState.isLoading // Флаг загрузки
-    val errorMessage = weatherState.errorMessage // Сообщение об ошибке
+    val uiState by viewModel.uiState.collectAsState()
 
-    // Эти состояния пока остаются в DryDriveScreen, т.к. они больше связаны с UI поиска
-    // Позже мы их тоже можем перенести в ViewModel или в отдельный UiState для поиска
-    var cityForDisplay by remember { mutableStateOf("Moscow") }
-    var selectedCityObject by remember { mutableStateOf<City?>(null) }
-
-
-    val scope = rememberCoroutineScope() // scope остается для действий, не связанных с ViewModel напрямую (например, Snackbar, Drawer)
+    val scope = rememberCoroutineScope() // Для Snackbar и Drawer
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-    val bottomMenuItems = listOf(
-        NavigationItem("Главная"),
-        NavigationItem("Карта"),
-        NavigationItem("Настройки")
-    )
-    val selectedItem = remember { mutableStateOf(bottomMenuItems.first().title) }
-
-    val carImage = when (weather?.weather?.getOrNull(0)?.main) {
-        "Rain", "Snow", "Thunderstorm" -> painterResource(id = R.drawable.car_dirty)
-        else -> painterResource(id = R.drawable.car_clean)
-    }
-
+    // TODO: Настроить TopAppBar и NavigationBar для соответствия стилю
+    // Для примера, они пока оставлены как есть или закомментированы, если не нужны
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
-                Text(
-                    text = "Меню",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(16.dp)
-                )
-                LazyColumn {
-                    items(listOf("Section 1", "Section 2", "Section 3")) { item ->
-                        NavigationDrawerItem(
-                            label = { Text(item) },
-                            selected = false,
-                            onClick = {}
-                        )
-                    }
-                }
-            }
+            ModalDrawerSheet { /* ... ваше меню ... */ }
         }
     ) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = { /*... ваш код ...*/ },
-            bottomBar = { /*... ваш код ...*/ },
-            floatingActionButton = { /*... ваш код ...*/ }
+            // TopAppBar можно убрать, если в дизайне его нет, или стилизовать
+            topBar = {
+                 TopAppBar(title = { Text("DryDrive", color = Color.White) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent))
+            },
+            // Нижняя навигация - ее нужно будет стилизовать под пример
+            bottomBar = {
+                NavigationBar(containerColor = Color.Black.copy(alpha = 0.8f)) { // Пример стилизации
+                    val navItems = listOf("Главная", "Карта", "Настройки") // Добавьте свои иконки
+                    navItems.forEach { itemTitle ->
+                        NavigationBarItem(
+                            selected = itemTitle == "Главная", // Пример, как определять выбранный
+                            onClick = { /* TODO: handle navigation */ },
+                            icon = {
+                                when (itemTitle) {
+                                    "Главная" -> Icon(Icons.Filled.Home, contentDescription = "Главная", tint = Color.White)
+                                    "Карта" -> Icon(Icons.Filled.Place, contentDescription = "Карта", tint = Color.White.copy(alpha=0.7f))
+                                    "Настройки" -> Icon(Icons.Filled.Settings, contentDescription = "Настройки", tint = Color.White.copy(alpha=0.7f))
+                                }
+                            },
+                            label = { Text(itemTitle, color = if (itemTitle == "Главная") Color.White else Color.White.copy(alpha=0.7f)) }
+                        )
+                    }
+                }
+            },
+            floatingActionButton = { /* Если FAB не нужен, его можно убрать */ }
         ) { paddingValues ->
+
             Box(
-                modifier = Modifier
+                modifier = modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                // Отступы Scaffold применяются к внутреннему Column
             ) {
+                // 1. Фоновое изображение города
                 Image(
-                    painter = painterResource(id = R.drawable.city_background),
-                    contentDescription = "City Background",
+                    painter = painterResource(id = R.drawable.city_background), // Убедитесь, что этот ресурс есть
+                    contentDescription = "Фон города",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+
+                // 2. Затемняющий слой
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f))
+                        .background(Color.Black.copy(alpha = 0.6f)) // Альфа-канал можно настроить
                 )
 
+                // 3. КОНТЕНТ поверх фона и затемнения
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(paddingValues) // Применяем отступы Scaffold здесь
+                        .padding(horizontal = 24.dp) // Общие горизонтальные отступы
+                        .padding(top = 16.dp, bottom = 16.dp) // Общие вертикальные отступы
                 ) {
+                    // Поле поиска города
                     CitySearchDropDown(
-                        // apiKey пока передаем, т.к. CitySearchDropDown его использует.
-                        // На следующем шаге мы перенесем и логику поиска городов в ViewModel.
-                        weatherApi = WeatherApi.create(), // <--- ПОКА ОСТАВЛЯЕМ ТАК, ИЗМЕНИМ НА СЛЕДУЮЩЕМ ШАГЕ
-                        apiKey = BuildConfig.WEATHER_API_KEY,  // <--- ПОКА ОСТАВЛЯЕМ ТАК
-                        initialCityName = cityForDisplay,
+                        searchQuery = uiState.searchQuery,
+                        onQueryChange = { query -> viewModel.onEvent(DryDriveEvent.SearchQueryChanged(query)) },
+                        cities = uiState.citySearchResults,
+                        expanded = uiState.isSearchDropDownExpanded,
+                        onDismissRequest = { viewModel.onEvent(DryDriveEvent.DismissCitySearchDropDown) },
                         onCitySelected = { city, formattedName ->
-                            selectedCityObject = city
-                            cityForDisplay = formattedName
-                            viewModel.clearErrorMessage() // Очищаем предыдущую ошибку погоды
-                            viewModel.fetchWeatherForCity(city) // Запрашиваем погоду через ViewModel
-                            Log.d("DryDriveScreen", "City selected: $formattedName, object: $city. Weather fetch initiated via ViewModel.")
+                            viewModel.onEvent(DryDriveEvent.CitySelectedFromSearch(city, formattedName))
                         },
-                        modifier = Modifier.fillMaxWidth(0.8f),
-                        onError = { errorMsg ->
-                            // Эта ошибка относится к поиску городов, ее обработка пока остается здесь
-                            // Позже объединим с errorMessage из ViewModel или сделаем отдельное состояние для ошибок поиска
-                            if (errorMsg.isNotBlank()) {
-                                // Тут нужно решить, как отображать ошибку поиска.
-                                // Пока можно использовать тот же snackbarHostState или отдельный Text.
-                                // Для простоты пока оставим как есть, но это кандидат на улучшение.
-                                scope.launch { snackbarHostState.showSnackbar("Ошибка поиска: $errorMsg") }
-                            }
-                            Log.d("DryDriveScreen", "onError from CitySearchDropDown: '$errorMsg'")
-                        }
-                    )
-
-                    Button(
-                        onClick = {
-                            selectedCityObject?.let { city ->
-                                viewModel.fetchWeatherForCity(city) // Запрашиваем погоду через ViewModel
-                                Log.d("DryDriveScreen", "BUTTON_CLICK: Fetch weather for ${city.name} via ViewModel.")
-                            }
-                            // Если selectedCityObject null, кнопка неактивна, так что else не нужен
-                        },
-                        modifier = Modifier.padding(top = 16.dp),
-                        enabled = selectedCityObject != null && !isLoadingWeather // Делаем кнопку неактивной и во время загрузки
-                    ) {
-                        Text(
-                            if (isLoadingWeather) "Загрузка..."
-                            else if (weather != null && selectedCityObject?.name == weather.name) "Обновить погоду"
-                            else "Узнать погоду"
-                        )
-                    }
-
-                    // Отображение индикатора загрузки погоды
-                    if (isLoadingWeather) {
-                        CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
-                    }
-
-                    Image(
-                        painter = carImage,
-                        contentDescription = "Car Image",
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .padding(vertical = 16.dp),
-                        contentScale = ContentScale.Fit
-                    )
-
-                    // Отображение данных о погоде или ошибки
-                    AnimatedVisibility(
-                        visible = !isLoadingWeather && weather != null && errorMessage == null, // Показываем, если нет загрузки, есть погода и нет ошибки
-                        enter = fadeIn(tween(500)),
-                        exit = fadeOut()
-                    ) {
-                        weather?.let { w ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .clip(RoundedCornerShape(16.dp))
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    val recommendation = when (w.weather.getOrNull(0)?.main) {
-                                        "Rain" -> "Мыть не стоит: дождь"
-                                        "Snow" -> "Мыть не стоит: снег"
-                                        "Mist", "Fog" -> "Мыть не стоит: туман"
-                                        "Thunderstorm" -> "Мыть не стоит: гроза"
-                                        else -> "Можно мыть машину"
-                                    }
-                                    Text(
-                                        text = "${w.main.temp.toInt()}°C",
-                                        style = MaterialTheme.typography.headlineMedium
-                                    )
-                                    Text(
-                                        text = w.weather.getOrNull(0)?.description ?: "Нет данных",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        modifier = Modifier.padding(top = 8.dp)
-                                    )
-                                    Text(
-                                        text = recommendation,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Отображение ошибки загрузки погоды
-                    if (!isLoadingWeather && errorMessage != null) {
-                        Text(
-                            text = errorMessage, // Ошибка из ViewModel
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(top = 16.dp)
-                        )
-                    }
-
-                    LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(getSampleWeatherForecast()) { dayWeather ->
-                            Card(
-                                modifier = Modifier
-                                    .size(100.dp, 120.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(dayWeather.day)
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_cloud),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Text("${dayWeather.temp.toInt()}°C")
-                                }
-                            }
-                        }
+                            .padding(bottom = 16.dp), // Отступ под полем поиска
+                        isLoading = uiState.isLoadingCities,
+                        errorMessage = uiState.citySearchErrorMessage
+                    )
+
+                    // Spacer(modifier = Modifier.height(16.dp)) // Дополнительный отступ, если нужен
+
+                    // Блок с основной информацией о погоде
+                    // Он будет выше, если нет Spacer(Modifier.weight(1f)) перед ним
+                    if (uiState.isLoadingWeather && uiState.weather == null) { // Показываем загрузку только если погоды еще нет
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(vertical = 50.dp)
+                        )
+                    } else if (uiState.weatherErrorMessage != null && uiState.weather == null) { // Показываем ошибку только если погоды нет
+                        Text(
+                            text = uiState.weatherErrorMessage!!,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 50.dp)
+                        )
+                    } else if (uiState.weather != null) {
+                        WeatherDetails(weather = uiState.weather)
+                    } else {
+                        // Начальное состояние или если город еще не выбран
+                        // Можно добавить Placeholder или оставить пустым
+                        Spacer(modifier = Modifier.height(150.dp)) // Занимаем место, чтобы прогноз не уехал вверх
                     }
+
+                    // Этот Spacer отодвигает DailyForecastRow вниз,
+                    // освобождая место для WeatherDetails и кнопки "Узнать погоду" (если она нужна)
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Кнопка "Узнать погоду" - ее можно убрать, если загрузка происходит автоматически
+                    // или если она не вписывается в дизайн примера.
+                    // Button(
+                    //    onClick = { viewModel.onEvent(DryDriveEvent.RefreshWeatherClicked) },
+                    //    modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 16.dp),
+                    //    enabled = uiState.selectedCityObject != null && !uiState.isLoadingWeather,
+                    //    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0095FF))
+                    // ) {
+                    //    Text(
+                    //        if (uiState.isLoadingWeather && uiState.weather == null) "Загрузка..." // Только если нет данных
+                    //        else if (uiState.weather != null) "Обновить погоду"
+                    //        else "Узнать погоду",
+                    //        color = Color.White
+                    //    )
+                    // }
+
+
+                    // Прогноз на несколько дней
+                    if (uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty()) {
+                        // Можно добавить маленький индикатор для прогноза, если он грузится отдельно
+                        // CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).size(32.dp))
+                    } else if (uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty()) {
+                        Text(
+                            text = "Не удалось загрузить прогноз.", //uiState.forecastErrorMessage!!,
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        )
+                    } else if (uiState.dailyForecasts.isNotEmpty()) {
+                        DailyForecastRow(forecasts = uiState.dailyForecasts)
+                    }
+
+                    // Spacer(modifier = Modifier.height(16.dp)) // Дополнительный отступ внизу, если нужно
                 }
             }
         }
     }
 }
 
-data class DayWeather(val day: String, val temp: Double)
 
-fun getSampleWeatherForecast(): List<DayWeather> = listOf(
-    DayWeather("Mon", 15.0),
-    DayWeather("Tue", 14.0),
-    DayWeather("Wed", 16.0),
-    DayWeather("Thu", 13.0),
-    DayWeather("Fri", 17.0),
-    DayWeather("Sat", 12.0),
-    DayWeather("Sun", 18.0)
-)
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun DryDriveScreenPreview() {
     DryDriveTheme {
+        // Для превью можно использовать фейковый ViewModel или передать UiState напрямую,
+        // но это потребует больше настроек. Простой запуск DryDriveScreen() покажет только статику.
         DryDriveScreen()
     }
 }
+
