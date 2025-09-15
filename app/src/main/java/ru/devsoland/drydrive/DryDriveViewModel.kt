@@ -3,7 +3,6 @@ package ru.devsoland.drydrive
 import android.os.Build
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
-// import androidx.compose.animation.core.copy // Этот импорт, вероятно, не нужен, если используется copy() для data class
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -18,19 +17,22 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn // Для collect в init
-import kotlinx.coroutines.flow.onEach // Для collect в init
+import kotlinx.coroutines.flow.first // Для однократного получения значения из Flow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import ru.devsoland.drydrive.data.City // Убедитесь, что City имеет localNames: Map<String, String>?
-import ru.devsoland.drydrive.data.ForecastListItem // Я добавил этот импорт, предполагая, что он вам нужен
+import ru.devsoland.drydrive.data.City
+import ru.devsoland.drydrive.data.ForecastListItem
 import ru.devsoland.drydrive.data.ForecastResponse
 import ru.devsoland.drydrive.data.Weather
 import ru.devsoland.drydrive.data.WeatherApi
 import ru.devsoland.drydrive.data.preferences.AppLanguage
-import ru.devsoland.drydrive.data.preferences.LanguageManager
+// ИЗМЕНЕННЫЙ ИМПОРТ
+import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
+// КОНЕЦ ИЗМЕНЕННОГО ИМПОРТА
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -45,35 +47,27 @@ data class DisplayDayWeather(
 )
 
 data class DryDriveUiState(
-    // Состояние текущей погоды
     val weather: Weather? = null,
     val isLoadingWeather: Boolean = false,
     val weatherErrorMessage: String? = null,
-
-    // Состояние поиска города
     val searchQuery: String = "",
     val citySearchResults: List<City> = emptyList(),
     val isLoadingCities: Boolean = false,
     val citySearchErrorMessage: String? = null,
     val isSearchDropDownExpanded: Boolean = false,
-
-    // Состояние выбранного города
-    val cityForDisplay: String = "Moscow", // Это имя будет обновляться локализованным значением
+    val cityForDisplay: String = "", // Изначально пустая, будет заполнена из настроек или при выборе
     val selectedCityObject: City? = null,
-
-    // Состояние прогноза погоды
     val dailyForecasts: List<DisplayDayWeather> = emptyList(),
     val isLoadingForecast: Boolean = false,
     val forecastErrorMessage: String? = null,
-
-    // НОВОЕ ПОЛЕ: Код текущего языка приложения
-    val currentLanguageCode: String = AppLanguage.SYSTEM.code // Инициализируем системным (пустой строкой)
+    val currentLanguageCode: String = AppLanguage.SYSTEM.code,
+    val isInitialLoading: Boolean = true // Флаг для начальной загрузки (показ индикатора)
 )
 
 @HiltViewModel
 class DryDriveViewModel @Inject constructor(
     private val weatherApi: WeatherApi,
-    private val languageManager: LanguageManager
+    private val userPreferencesManager: UserPreferencesManager // ИЗМЕНЕН ТИП
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DryDriveUiState())
@@ -81,18 +75,20 @@ class DryDriveViewModel @Inject constructor(
 
     private val apiKey = BuildConfig.WEATHER_API_KEY
     private var citySearchJob: Job? = null
+    private var initialLoadJob: Job? = null // Для отслеживания загрузки начального города
 
     private companion object {
-        // ... (константы без изменений)
         const val MSG_CITIES_NOT_FOUND = "Города не найдены: "
         const val MSG_CITY_SEARCH_ERROR = "Ошибка поиска: "
         const val MSG_CITY_NOT_FOUND_WEATHER = "Город не найден: "
         const val MSG_WEATHER_LOAD_ERROR = "Ошибка при загрузке погоды: "
         const val MSG_FORECAST_LOAD_ERROR = "Ошибка загрузки прогноза: "
         const val MSG_COORDINATES_NOT_FOUND = "Координаты для прогноза не найдены."
+        const val DEFAULT_CITY_FALLBACK = "Moscow" // Фолбэк, если ничего не сохранено
     }
 
-    val currentLanguage: StateFlow<AppLanguage> = languageManager.selectedLanguageFlow
+    // currentLanguage теперь берется из userPreferencesManager
+    val currentLanguage: StateFlow<AppLanguage> = userPreferencesManager.selectedLanguageFlow
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -103,37 +99,61 @@ class DryDriveViewModel @Inject constructor(
     val recreateActivityEvent: SharedFlow<Unit> = _recreateActivityEvent.asSharedFlow()
 
     init {
-        // Обновляем searchQuery и currentLanguageCode в UiState при инициализации
-        // и при каждом изменении currentLanguage
+        // 1. Подписка на изменение языка для обновления uiState.currentLanguageCode
         currentLanguage
             .onEach { appLang ->
                 _uiState.update { currentState ->
-                    currentState.copy(
-                        searchQuery = if (currentState.selectedCityObject == null) currentState.cityForDisplay else currentState.searchQuery, // searchQuery обновляем аккуратно
-                        currentLanguageCode = appLang.code
-                    )
+                    currentState.copy(currentLanguageCode = appLang.code)
                 }
                 Log.d("ViewModelInit", "UiState.currentLanguageCode updated to: ${appLang.code}")
             }
-            .launchIn(viewModelScope) // Запускаем сбор Flow
+            .launchIn(viewModelScope)
 
-        // Устанавливаем начальное значение searchQuery, если город по умолчанию не выбран
-        // Это может быть перекрыто обновлением из currentLanguage.collect, если cityForDisplay останется "Moscow"
-        if (_uiState.value.selectedCityObject == null) {
-            _uiState.update { it.copy(searchQuery = it.cityForDisplay) }
+        // 2. Загрузка последнего сохраненного города или города по умолчанию
+        initialLoadJob = viewModelScope.launch {
+            // Сначала дождемся, пока currentLanguageCode будет установлен в UiState, чтобы корректно отформатировать имя
+            val initialLangCode = currentLanguage.first().code // Получаем первый (текущий) код языка
+            _uiState.update { it.copy(currentLanguageCode = initialLangCode, isInitialLoading = true) }
+
+
+            val lastCity = userPreferencesManager.lastSelectedCityFlow.first() // Получаем однократно
+            if (lastCity != null) {
+                Log.d("ViewModelInit", "Last selected city found: ${lastCity.name}")
+                // Форматируем имя с учетом текущего языка приложения
+                val formattedName = formatCityNameInternal(lastCity, initialLangCode)
+                _uiState.update {
+                    it.copy(
+                        selectedCityObject = lastCity,
+                        cityForDisplay = formattedName,
+                        searchQuery = formattedName, // Обновляем searchQuery, чтобы поле поиска не было пустым
+                        isInitialLoading = false // Завершили попытку загрузки начального города
+                    )
+                }
+                fetchCurrentWeatherAndForecast(lastCity)
+            } else {
+                Log.d("ViewModelInit", "No last selected city. Attempting to load default: $DEFAULT_CITY_FALLBACK")
+                // Если нет сохраненного города, можно загрузить город по умолчанию (например, Москву)
+                // Или оставить cityForDisplay пустым, чтобы пользователь выбрал город
+                // _uiState.update { it.copy(cityForDisplay = "Выберите город", isInitialLoading = false) } // Пример
+                findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true) // Загружаем Москву по умолчанию
+            }
         }
-
-        // Если вы хотите загружать погоду для города по умолчанию ("Moscow") при старте:
-        // Это потребует создания объекта City для "Moscow" или его поиска.
-        // viewModelScope.launch {
-        //     findCityByNameAndFetchWeather("Moscow") // Пример вызова
-        // }
     }
 
+    // Внутренняя функция для форматирования имени города, чтобы не дублировать логику MainActivity
+    // Это упрощенная версия, MainActivity.formatCityName более полная
+    private fun formatCityNameInternal(city: City, langCode: String): String {
+        val displayName = when {
+            langCode.isNotBlank() && city.localNames?.containsKey(langCode) == true -> city.localNames[langCode]
+            city.localNames?.containsKey("en") == true -> city.localNames["en"]
+            else -> city.name
+        } ?: city.name
+        return "$displayName, ${city.country}" + if (city.state != null) ", ${city.state}" else ""
+    }
+
+
     private fun getApiLangCode(): String? {
-        // Используем currentLanguageCode из UiState, так как он синхронизирован
-        // или напрямую из currentLanguage.value.code, что более прямолинейно здесь.
-        val langCode = currentLanguage.value.code
+        val langCode = _uiState.value.currentLanguageCode // Берем из UiState, т.к. он синхронизирован
         return if (langCode.isEmpty()) null else langCode
     }
 
@@ -141,34 +161,37 @@ class DryDriveViewModel @Inject constructor(
         when (event) {
             is DryDriveEvent.SearchQueryChanged -> handleSearchQueryChanged(event.query)
             is DryDriveEvent.CitySelectedFromSearch -> {
-                // formattedName теперь должен приходить уже локализованным из MainActivity
+                // formattedName уже локализован MainActivity
                 handleCitySelected(event.city, event.formattedName)
             }
             DryDriveEvent.DismissCitySearchDropDown -> _uiState.update { it.copy(isSearchDropDownExpanded = false) }
-            DryDriveEvent.RefreshWeatherClicked -> _uiState.value.selectedCityObject?.let { fetchCurrentWeatherAndForecast(it) }
+            DryDriveEvent.RefreshWeatherClicked -> {
+                _uiState.value.selectedCityObject?.let {
+                    fetchCurrentWeatherAndForecast(it)
+                } ?: run {
+                    // Если город не выбран, но нажали обновить, можно попробовать загрузить город по умолчанию
+                    Log.d("ViewModelEvent", "Refresh clicked but no city selected. Loading default.")
+                    findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true)
+                }
+            }
             DryDriveEvent.ClearWeatherErrorMessage -> _uiState.update { it.copy(weatherErrorMessage = null, forecastErrorMessage = null) }
         }
     }
 
     private fun handleSearchQueryChanged(query: String) {
-        // ... (код без существенных изменений, только передача apiLang)
-        _uiState.update { it.copy(searchQuery = query, isSearchDropDownExpanded = query.isNotEmpty()) }
+        _uiState.update { it.copy(searchQuery = query, isSearchDropDownExpanded = query.isNotEmpty(), citySearchErrorMessage = null) } // Сбрасываем ошибку при новом поиске
         citySearchJob?.cancel()
-        Log.d("ViewModelEvents", "Event: SearchQueryChanged to '$query'. Previous job cancelled.")
+        Log.d("ViewModelEvents", "Event: SearchQueryChanged to '$query'.")
 
         if (query.length > 2) {
-            _uiState.update { it.copy(isLoadingCities = true, citySearchErrorMessage = null) }
+            _uiState.update { it.copy(isLoadingCities = true) }
             citySearchJob = viewModelScope.launch {
-                val apiLang = getApiLangCode() // Получаем язык для API
+                val apiLang = getApiLangCode()
                 Log.d("ViewModelAPI", "Starting city search for: '$query' with lang: '$apiLang'")
                 delay(500)
                 try {
                     val results = withContext(Dispatchers.IO) {
-                        weatherApi.searchCities(
-                            query = query,
-                            apiKey = apiKey,
-                            lang = apiLang
-                        )
+                        weatherApi.searchCities(query = query, apiKey = apiKey, lang = apiLang)
                     }
                     _uiState.update {
                         it.copy(
@@ -179,6 +202,7 @@ class DryDriveViewModel @Inject constructor(
                         )
                     }
                 } catch (e: Exception) {
+                    // ... (обработка ошибок без изменений)
                     if (e is kotlinx.coroutines.CancellationException) {
                         Log.w("ViewModelEvents", "Search for '$query' was cancelled.")
                         _uiState.update { it.copy(isLoadingCities = false) }
@@ -196,36 +220,38 @@ class DryDriveViewModel @Inject constructor(
             }
         } else {
             _uiState.update {
-                it.copy(
-                    citySearchResults = emptyList(),
-                    isLoadingCities = false,
-                    citySearchErrorMessage = null,
-                    isSearchDropDownExpanded = false
-                )
+                it.copy(citySearchResults = emptyList(), isLoadingCities = false, isSearchDropDownExpanded = false)
             }
         }
     }
 
     private fun handleCitySelected(city: City, formattedName: String) {
-        // formattedName уже должен быть локализован MainActivity перед передачей сюда
+        // formattedName уже локализован MainActivity
+        initialLoadJob?.cancel() // Отменяем начальную загрузку, если она еще идет, т.к. пользователь выбрал город
         _uiState.update {
             it.copy(
                 selectedCityObject = city,
-                cityForDisplay = formattedName, // Используем локализованное имя
-                searchQuery = formattedName,    // и для поля поиска
+                cityForDisplay = formattedName,
+                searchQuery = formattedName,
                 citySearchResults = emptyList(),
                 isSearchDropDownExpanded = false,
                 weatherErrorMessage = null,
                 forecastErrorMessage = null,
-                dailyForecasts = emptyList()
+                dailyForecasts = emptyList(),
+                isInitialLoading = false // Пользовательский выбор завершает начальную загрузку
             )
         }
         fetchCurrentWeatherAndForecast(city)
+        // Сохраняем выбранный город
+        viewModelScope.launch {
+            userPreferencesManager.saveLastSelectedCity(city)
+            Log.d("ViewModelCitySave", "Saved city to preferences: ${city.name}")
+        }
     }
 
     private fun fetchCurrentWeatherAndForecast(city: City) {
         viewModelScope.launch {
-            val apiLang = getApiLangCode() // Получаем язык для API
+            val apiLang = getApiLangCode()
             Log.d("ViewModelAPI", "Fetching weather and forecast for city: '${city.name}' (API name) with lang: '$apiLang'")
 
             _uiState.update {
@@ -234,18 +260,13 @@ class DryDriveViewModel @Inject constructor(
                     isLoadingForecast = true, dailyForecasts = emptyList(), forecastErrorMessage = null
                 )
             }
-
+            // ... (остальной код fetchCurrentWeatherAndForecast без изменений, до финального update)
             var weatherFetchError: String? = null
             var forecastFetchError: String? = null
-            // var currentWeatherData: Weather? = null // Переменная не используется для присвоения перед update
 
             try {
-                val fetchedWeather = withContext(Dispatchers.IO) { // Сохраняем в новую переменную
-                    weatherApi.getWeather(
-                        city = city.name, // Для API используем оригинальное имя city.name или city.id если есть
-                        apiKey = apiKey,
-                        lang = apiLang
-                    )
+                val fetchedWeather = withContext(Dispatchers.IO) {
+                    weatherApi.getWeather(city = city.name, apiKey = apiKey, lang = apiLang)
                 }
                 _uiState.update { it.copy(weather = fetchedWeather) }
             } catch (e: Exception) {
@@ -260,12 +281,7 @@ class DryDriveViewModel @Inject constructor(
             if (city.lat != 0.0 && city.lon != 0.0) {
                 try {
                     val forecastResponse = withContext(Dispatchers.IO) {
-                        weatherApi.getFiveDayForecast(
-                            lat = city.lat,
-                            lon = city.lon,
-                            apiKey = apiKey,
-                            lang = apiLang
-                        )
+                        weatherApi.getFiveDayForecast(lat = city.lat, lon = city.lon, apiKey = apiKey, lang = apiLang)
                     }
                     val processedForecasts = processForecastResponse(forecastResponse, apiLang)
                     _uiState.update { it.copy(dailyForecasts = processedForecasts) }
@@ -282,27 +298,26 @@ class DryDriveViewModel @Inject constructor(
                 it.copy(
                     isLoadingWeather = false,
                     isLoadingForecast = false,
-                    weatherErrorMessage = weatherFetchError ?: it.weatherErrorMessage, // Сохраняем существующую ошибку, если новая null
-                    forecastErrorMessage = forecastFetchError ?: it.forecastErrorMessage
+                    weatherErrorMessage = weatherFetchError ?: it.weatherErrorMessage,
+                    forecastErrorMessage = forecastFetchError ?: it.forecastErrorMessage,
+                    isInitialLoading = false // Завершение любой активной загрузки
                 )
             }
         }
     }
 
     private fun processForecastResponse(response: ForecastResponse, apiLanguageCode: String?): List<DisplayDayWeather> {
-        val dailyData = mutableMapOf<String, MutableList<ForecastListItem>>() // Убедитесь, что ForecastListItem импортирован
-
+        // ... (код без изменений)
+        val dailyData = mutableMapOf<String, MutableList<ForecastListItem>>()
         val displayLocale = when {
-            apiLanguageCode == null || apiLanguageCode.isEmpty() -> Locale.getDefault() // Используем локаль устройства, если API вернул на en (системный)
+            apiLanguageCode == null || apiLanguageCode.isEmpty() -> Locale.getDefault()
             else -> Locale(apiLanguageCode)
         }
         Log.d("ProcessForecast", "Using locale for dayOfWeekFormat: $displayLocale (based on apiLang: $apiLanguageCode)")
-
         val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
         inputFormat.timeZone = TimeZone.getTimeZone("UTC")
         val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         val dayOfWeekFormat = SimpleDateFormat("E", displayLocale)
-
         response.list.forEach { item ->
             try {
                 val date = inputFormat.parse(item.dtTxt)
@@ -314,24 +329,17 @@ class DryDriveViewModel @Inject constructor(
                 Log.e("ProcessForecast", "Error parsing date: ${item.dtTxt}", e)
             }
         }
-
         val displayForecasts = mutableListOf<DisplayDayWeather>()
         val todayCal = Calendar.getInstance()
-
         dailyData.entries.sortedBy { it.key }.take(5).forEachIndexed { index, entry ->
             val dayItems = entry.value
             val targetItem = dayItems.find { it.dtTxt.substring(11, 13) == "12" } ?: dayItems.firstOrNull()
-
             targetItem?.let { item ->
                 val itemDate = inputFormat.parse(item.dtTxt)
                 val dayLabel = if (index == 0 && itemDate != null && isSameDay(itemDate, todayCal)) {
-                    "Сейчас" // TODO: Локализовать через ресурсы (потребует Context во ViewModel или передачи из UI)
+                    "Сейчас" // TODO: Локализовать
                 } else {
-                    itemDate?.let {
-                        dayOfWeekFormat.format(it).replaceFirstChar { char ->
-                            if (char.isLowerCase()) char.titlecase(displayLocale) else char.toString()
-                        }
-                    } ?: "???"
+                    itemDate?.let { dayOfWeekFormat.format(it).replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(displayLocale) else char.toString() } } ?: "???"
                 }
                 val iconRes = mapWeatherConditionToIcon(item.weather.firstOrNull()?.main, item.weather.firstOrNull()?.icon)
                 val temperature = "${item.main.temp.toInt()}°"
@@ -342,7 +350,7 @@ class DryDriveViewModel @Inject constructor(
     }
 
     private fun isSameDay(date: Date, calendar: Calendar): Boolean {
-        // ... (код без изменений) ...
+        // ... (код без изменений)
         val itemCalendar = Calendar.getInstance()
         itemCalendar.time = date
         return calendar.get(Calendar.YEAR) == itemCalendar.get(Calendar.YEAR) &&
@@ -350,144 +358,121 @@ class DryDriveViewModel @Inject constructor(
     }
 
     private fun mapWeatherConditionToIcon(condition: String?, iconCode: String?): Int {
-        // ... (ваш код R.drawable.* без изменений) ...
+        // ... (код R.drawable.* без изменений)
         return when (iconCode) {
-            "01d" -> R.drawable.ic_sun_filled
-            "01n" -> R.drawable.ic_sun_filled
-            "02d" -> R.drawable.ic_sun_filled
-            "03d" -> R.drawable.ic_cloud
-            "04d" -> R.drawable.ic_sun_filled
-            "02n" -> R.drawable.ic_sun_filled
-            "03n", "04n" -> R.drawable.ic_cloud
-            "09d", "09n" -> R.drawable.ic_sun_filled
-            "10d" -> R.drawable.ic_sun_filled
-            "10n" -> R.drawable.ic_sun_filled
-            "11d", "11n" -> R.drawable.ic_sun_filled
-            "13d", "13n" -> R.drawable.ic_sun_filled
-            "50d", "50n" -> R.drawable.ic_sun_filled
+            "01d" -> R.drawable.ic_sun_filled; "01n" -> R.drawable.ic_sun_filled
+            "02d" -> R.drawable.ic_sun_filled; "02n" -> R.drawable.ic_sun_filled
+            "03d" -> R.drawable.ic_cloud; "03n" -> R.drawable.ic_cloud
+            "04d" -> R.drawable.ic_sun_filled; "04n" -> R.drawable.ic_cloud // 04d usually more cloudy, but using sun_filled for now
+            "09d", "09n" -> R.drawable.ic_sun_filled // rain
+            "10d" -> R.drawable.ic_sun_filled; "10n" -> R.drawable.ic_sun_filled // sun with rain
+            "11d", "11n" -> R.drawable.ic_sun_filled // thunderstorm
+            "13d", "13n" -> R.drawable.ic_sun_filled // snow
+            "50d", "50n" -> R.drawable.ic_sun_filled // mist
             else -> R.drawable.ic_cloud
         }
     }
 
     fun onLanguageSelected(language: AppLanguage) {
         viewModelScope.launch {
-            val previousLanguage = currentLanguage.value // Это значение AppLanguage
-            if (previousLanguage.code == language.code) { // Сравниваем коды, чтобы избежать ненужных действий
-                Log.d("ViewModelLanguage", "Language code '${language.code}' already selected. No action.")
-                // Если мы все равно хотим вызвать recreate (например, для системного языка), эту проверку можно усложнить
-                if (language == AppLanguage.SYSTEM && previousLanguage != AppLanguage.SYSTEM) {
-                    // Разрешаем, если до этого был не системный, а теперь выбрали системный
-                } else if (previousLanguage.code == language.code) {
-                    return@launch
-                }
+            val previousLangCode = _uiState.value.currentLanguageCode
+            if (previousLangCode == language.code && !(language == AppLanguage.SYSTEM && previousLangCode.isNotEmpty())) {
+                Log.d("ViewModelLanguage", "Language code '${language.code}' already selected or effectively the same. No action unless switching to SYSTEM from specific.")
+                // Если мы все равно хотим вызвать recreate (например, для системного языка, который может измениться)
+                // то условие здесь должно быть более сложным, или recreateActivityEvent должно вызываться всегда.
+                // Пока оставим так: не делаем ничего, если код языка не изменился, кроме случая, когда Явно выбрали SYSTEM.
+                if (language == AppLanguage.SYSTEM && previousLangCode.isEmpty()) return@launch // Уже системный
+                if (language != AppLanguage.SYSTEM && previousLangCode == language.code) return@launch // Уже этот конкретный язык
             }
 
-            languageManager.saveSelectedLanguage(language)
-            // currentLanguage и uiState.currentLanguageCode обновятся автоматически через Flow
+            userPreferencesManager.saveSelectedLanguage(language)
+            // _uiState.currentLanguageCode обновится через collect в init
 
-            Log.d("ViewModelLanguage", "Language with code '${language.code}' saved. UiState will update via collect.")
+            Log.d("ViewModelLanguage", "Language with code '${language.code}' saved.")
 
             _uiState.value.selectedCityObject?.let { city ->
-                Log.d("ViewModelLanguage", "Language changed, refreshing weather data for ${city.name}")
+                Log.d("ViewModelLanguage", "Language changed, refreshing weather for ${city.name}")
+                // Переформатируем cityForDisplay с новым языком
+                val newFormattedName = formatCityNameInternal(city, language.code)
+                _uiState.update { it.copy(cityForDisplay = newFormattedName, searchQuery = if(it.searchQuery == it.cityForDisplay) newFormattedName else it.searchQuery ) } // Обновляем и searchQuery, если он был равен cityForDisplay
+                Log.d("ViewModelLanguage", "Updated cityForDisplay to: $newFormattedName")
                 fetchCurrentWeatherAndForecast(city) // Загрузит погоду и прогноз на новом языке
-
-                // Обновляем cityForDisplay. MainActivity должна будет передать новое отформатированное имя
-                // при следующем взаимодействии, или мы можем попытаться сформировать его здесь,
-                // если бы у нас была formatCityName.
-                // Поскольку MainActivity формирует formattedName при выборе,
-                // и мы передаем новый currentLanguageCode в UiState,
-                // TopAppBar должен будет перерисоваться с новым языком.
-                // Главное, чтобы cityForDisplay обновился, если пользователь выберет город заново.
-                // При простой смене языка, если город уже выбран, TopAppBar сам использует новый uiState.currentLanguageCode
-                // для форматирования отображаемого uiState.cityForDisplay (если бы мы так сделали в MainActivity).
-                // Но так как cityForDisplay - это просто строка, она не обновится сама.
-                // ПРОСТОЕ РЕШЕНИЕ: Очистить cityForDisplay, чтобы UI показал "Select City" или переформатировал
-                // имя при следующем удобном случае.
-                // ЛУЧШЕЕ РЕШЕНИЕ: ViewModel не должна знать о formatCityName.
-                // MainActivity при сборе uiState должна форматировать имя города для отображения,
-                // используя uiState.selectedCityObject и uiState.currentLanguageCode.
-                // Пока что, при смене языка, cityForDisplay останется старым, пока город не выберут заново.
-                // Чтобы это исправить, MainActivity должна быть ответственна за форматирование cityForDisplay.
-                // Компромисс: если `selectedCityObject` есть, и язык меняется, можно попробовать найти
-                // имя на новом языке в `localNames` и обновить `cityForDisplay`.
-
-                val newLangCode = language.code
-                val newDisplayName = when {
-                    newLangCode.isNotBlank() && city.localNames?.containsKey(newLangCode) == true -> city.localNames[newLangCode]
-                    city.localNames?.containsKey("en") == true -> city.localNames["en"]
-                    else -> city.name
-                } ?: city.name
-                val country = city.country
-                val state = city.state
-                val newFormattedCityForDisplay = "$newDisplayName, $country" + if (state != null) ", $state" else ""
-
-                _uiState.update { it.copy(cityForDisplay = newFormattedCityForDisplay) }
-                Log.d("ViewModelLanguage", "Updated cityForDisplay to: $newFormattedCityForDisplay after language change.")
-
             } ?: run {
-                Log.d("ViewModelLanguage", "Language changed, but no city selected to refresh weather or cityForDisplay.")
-                // Если город по умолчанию "Moscow" и мы хотим его обновить:
-                if (_uiState.value.cityForDisplay == "Moscow" && _uiState.value.selectedCityObject == null) {
-                    // viewModelScope.launch { findCityByNameAndFetchWeather("Moscow", true) } // true - для обновления display name
+                Log.d("ViewModelLanguage", "Language changed, but no city selected. Maybe refresh default?")
+                // Если нет выбранного города, но есть город по умолчанию, можно обновить его имя и перезагрузить
+                if (_uiState.value.cityForDisplay == DEFAULT_CITY_FALLBACK && _uiState.value.selectedCityObject == null) {
+                    findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true)
                 }
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 try {
-                    val localeListToSet = if (language.code.isEmpty()) { // Проверяем напрямую code
+                    val localeListToSet = if (language.code.isEmpty()) {
                         LocaleListCompat.getEmptyLocaleList()
                     } else {
                         LocaleListCompat.forLanguageTags(language.code)
                     }
                     AppCompatDelegate.setApplicationLocales(localeListToSet)
-                    Log.d("ViewModelLanguage", "Application locales call finished for ${language.code.ifEmpty { "SYSTEM" }}")
                 } catch (e: Exception) {
                     Log.e("ViewModelLanguage", "Error setting application locales: ${e.message}", e)
                 }
             }
-
-            Log.d("ViewModelLanguage", "Emitting recreateActivityEvent")
             _recreateActivityEvent.emit(Unit)
         }
     }
 
-    // Примерная функция, если вы захотите загружать город по умолчанию при старте
-    // или при смене языка, если город не выбран.
-    // private fun findCityByNameAndFetchWeather(cityName: String, updateCityForDisplayWithNewLang: Boolean = false) {
-    //     viewModelScope.launch {
-    //         val apiLang = getApiLangCode()
-    //         try {
-    //             val cities = withContext(Dispatchers.IO) {
-    //                 weatherApi.searchCities(query = cityName, apiKey = apiKey, limit = 1, lang = apiLang)
-    //             }
-    //             cities.firstOrNull()?.let { city ->
-    //                 val langCodeForDisplay = uiState.value.currentLanguageCode
-    //                 val displayName = when {
-    //                     langCodeForDisplay.isNotBlank() && city.localNames?.containsKey(langCodeForDisplay) == true -> city.localNames[langCodeForDisplay]
-    //                     city.localNames?.containsKey("en") == true -> city.localNames["en"]
-    //                     else -> city.name
-    //                 } ?: city.name
-    //                 val country = city.country
-    //                 val state = city.state
-    //                 val formattedName = "$displayName, $country" + if (state != null) ", $state" else ""
-    //
-    //                 if (updateCityForDisplayWithNewLang || _uiState.value.selectedCityObject == null) {
-    //                     _uiState.update {
-    //                         it.copy(
-    //                             selectedCityObject = city,
-    //                             cityForDisplay = formattedName,
-    //                             searchQuery = formattedName
-    //                         )
-    //                     }
-    //                 } else { // Только обновить selectedCityObject если уже был какой-то другой
-    //                     _uiState.update { it.copy(selectedCityObject = city) }
-    //                 }
-    //                 fetchCurrentWeatherAndForecast(city)
-    //             }
-    //         } catch (e: Exception) {
-    //             Log.e("ViewModelDefaultCity", "Error finding/fetching default city $cityName: ${e.message}")
-    //         }
-    //     }
-    // }
+    // Внутренняя функция для поиска города по имени и обновления UI
+    private fun findCityByNameAndFetchWeatherInternal(cityName: String, isInitialOrFallback: Boolean = false) {
+        viewModelScope.launch {
+            if (isInitialOrFallback) {
+                _uiState.update { it.copy(isLoadingWeather = true, isLoadingForecast = true, isInitialLoading = true) }
+            }
+            val apiLang = getApiLangCode()
+            try {
+                Log.d("ViewModelInternalSearch", "Searching for city: $cityName with lang $apiLang")
+                val cities = withContext(Dispatchers.IO) {
+                    weatherApi.searchCities(query = cityName, apiKey = apiKey, limit = 1, lang = apiLang)
+                }
+                cities.firstOrNull()?.let { city ->
+                    Log.d("ViewModelInternalSearch", "City found: ${city.name}. Fetching weather.")
+                    // Имя для отображения формируется на основе текущего языка приложения
+                    val langCodeForDisplay = _uiState.value.currentLanguageCode
+                    val formattedName = formatCityNameInternal(city, langCodeForDisplay)
+
+                    _uiState.update {
+                        it.copy(
+                            selectedCityObject = city,
+                            cityForDisplay = formattedName,
+                            searchQuery = formattedName, // Заполняем searchQuery, чтобы пользователь видел имя
+                            isInitialLoading = !isInitialOrFallback // isInitialLoading сбрасывается, если это не начальная загрузка
+                        )
+                    }
+                    fetchCurrentWeatherAndForecast(city)
+                    // Если это была загрузка по умолчанию, и мы хотим сохранить этот город как "последний"
+                    if (isInitialOrFallback) { // Сохраняем только если это была загрузка по умолчанию и город НАЙДЕН
+                        userPreferencesManager.saveLastSelectedCity(city)
+                        Log.d("ViewModelInternalSearch", "Saved default city to preferences: ${city.name}")
+                    }
+                } ?: run {
+                    Log.w("ViewModelInternalSearch", "City $cityName not found via API.")
+                    _uiState.update {
+                        it.copy(
+                            cityForDisplay = if(it.cityForDisplay.isEmpty()) "Город не найден" else it.cityForDisplay, // Чтобы не было пустого поля
+                            weatherErrorMessage = "$MSG_CITY_NOT_FOUND_WEATHER $cityName",
+                            isLoadingWeather = false, isLoadingForecast = false, isInitialLoading = false
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ViewModelInternalSearch", "Error finding/fetching city $cityName: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        weatherErrorMessage = "$MSG_CITY_SEARCH_ERROR ${e.message}",
+                        isLoadingWeather = false, isLoadingForecast = false, isInitialLoading = false
+                    )
+                }
+            }
+        }
+    }
 }
 

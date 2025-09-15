@@ -8,6 +8,10 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,9 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,10 +45,12 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import ru.devsoland.drydrive.data.City // Убедитесь, что City имеет localNames: Map<String, String>?
+import ru.devsoland.drydrive.data.City
 import ru.devsoland.drydrive.data.preferences.AppLanguage
-import ru.devsoland.drydrive.data.preferences.LanguageManager
-import ru.devsoland.drydrive.di.LanguageManagerEntryPoint
+// ИЗМЕНЕННЫЕ ИМПОРТЫ
+import ru.devsoland.drydrive.data.preferences.UserPreferencesManager // Было LanguageManager
+import ru.devsoland.drydrive.di.UserPreferencesEntryPoint // Было LanguageManagerEntryPoint
+// КОНЕЦ ИЗМЕНЕННЫХ ИМПОРТОВ
 import ru.devsoland.drydrive.ui.composables.DailyForecastPlaceholder
 import ru.devsoland.drydrive.ui.composables.DailyForecastRow
 import ru.devsoland.drydrive.ui.composables.WeatherDetails
@@ -73,23 +76,18 @@ data class RecommendationSlot(
     val activeContentDescriptionResId: Int
 )
 
-// ОБНОВЛЕННАЯ ФУНКЦИЯ formatCityName
 fun formatCityName(city: City, currentAppLanguageCode: String): String {
     val displayName = when {
-        // 1. Пытаемся использовать язык приложения, если он не пуст и есть в localNames
         currentAppLanguageCode.isNotBlank() && city.localNames?.containsKey(currentAppLanguageCode) == true -> {
             city.localNames[currentAppLanguageCode]
         }
-        // 2. Если язык приложения пуст (системный) ИЛИ для него нет записи, пытаемся использовать "en" из localNames
         city.localNames?.containsKey("en") == true -> {
             city.localNames["en"]
         }
-        // 3. Фолбэк на основное имя city.name
         else -> {
             city.name
         }
-    } ?: city.name // Дополнительный фолбэк на случай, если из localNames пришел null
-
+    } ?: city.name
     return "$displayName, ${city.country}" + if (city.state != null) ", ${city.state}" else ""
 }
 // --- КОНЕЦ МОДЕЛЕЙ ---
@@ -99,23 +97,22 @@ class MainActivity : ComponentActivity() {
     private val dryDriveViewModel: DryDriveViewModel by viewModels()
 
     override fun attachBaseContext(newBase: Context) {
-        // ... (код без изменений) ...
         Log.d("MainActivityLifecycle", "attachBaseContext CALLED. Initial base context locale: ${newBase.resources.configuration.locale}")
 
-        val languageManager: LanguageManager
+        val userPreferencesManager: UserPreferencesManager // ИЗМЕНЕНО: тип и имя переменной
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 newBase.applicationContext,
-                LanguageManagerEntryPoint::class.java
+                UserPreferencesEntryPoint::class.java // ИЗМЕНЕНО: используем новый EntryPoint
             )
-            languageManager = entryPoint.getLanguageManager()
-            Log.d("MainActivityLifecycle", "LanguageManager obtained successfully via EntryPoint.")
+            userPreferencesManager = entryPoint.getUserPreferencesManager() // ИЗМЕНЕНО: вызываем новый метод
+            Log.d("MainActivityLifecycle", "UserPreferencesManager obtained successfully via EntryPoint.")
         } catch (e: IllegalStateException) {
-            Log.e("MainActivityLifecycle", "Hilt not ready in attachBaseContext to get LanguageManager: ${e.message}. Using default base context.", e)
+            Log.e("MainActivityLifecycle", "Hilt not ready in attachBaseContext to get UserPreferencesManager: ${e.message}. Using default base context.", e)
             super.attachBaseContext(newBase)
             return
         } catch (e: Exception) {
-            Log.e("MainActivityLifecycle", "Unexpected error getting LanguageManager: ${e.message}. Using default base context.", e)
+            Log.e("MainActivityLifecycle", "Unexpected error getting UserPreferencesManager: ${e.message}. Using default base context.", e)
             super.attachBaseContext(newBase)
             return
         }
@@ -123,7 +120,7 @@ class MainActivity : ComponentActivity() {
         val currentLanguageCode = try {
             Log.d("MainActivityLifecycle", "attachBaseContext: Attempting to get language code via runBlocking...")
             runBlocking {
-                languageManager.selectedLanguageFlow.first().code
+                userPreferencesManager.selectedLanguageFlow.first().code // ИЗМЕНЕНО: используем userPreferencesManager
             }
         } catch (e: Exception) {
             Log.e("MainActivityLifecycle", "Error getting language code in runBlocking for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.", e)
@@ -141,7 +138,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // ... (код без изменений) ...
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             Log.d("MainActivityLifecycle", "onCreate: Current resources locales (from resources.configuration): ${resources.configuration.locales.toLanguageTags()}")
         } else {
@@ -162,9 +158,6 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            // val currentLanguage by dryDriveViewModel.currentLanguage.collectAsState() // Это теперь не нужно здесь, если uiState содержит код языка
-            // Log.d("MainActivityCompose", "Recomposing with current language from ViewModel: ${currentLanguage.code}")
-
             DryDriveTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -177,11 +170,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- УТИЛИТНАЯ ФУНКЦИЯ ДЛЯ УСТАНОВКИ ЛОКАЛИ ---
 fun Context.setAppLocale(languageCode: String): Context {
-    // ... (код без изменений) ...
     Log.d("AppLocaleConfig", "Context.setAppLocale called with languageCode: '$languageCode'")
-
     val localeToSet: Locale = if (languageCode.isEmpty()) {
         val systemLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             resources.configuration.locales[0]
@@ -195,25 +185,18 @@ fun Context.setAppLocale(languageCode: String): Context {
         Log.d("AppLocaleConfig", "Using specific locale for code: $languageCode")
         Locale(languageCode)
     }
-
     Locale.setDefault(localeToSet)
-
     val config = Configuration(resources.configuration)
-
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        val localeList = android.os.LocaleList(localeToSet)
-        config.setLocales(localeList)
+        config.setLocales(android.os.LocaleList(localeToSet))
     } else {
         @Suppress("DEPRECATION")
         config.locale = localeToSet
     }
-
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         val localeListCompat = if (languageCode.isEmpty()) {
-            Log.d("AppLocaleConfig", "AppCompatDelegate: Setting to empty list (system default).")
             LocaleListCompat.getEmptyLocaleList()
         } else {
-            Log.d("AppLocaleConfig", "AppCompatDelegate: Setting to language tags: $languageCode")
             LocaleListCompat.forLanguageTags(languageCode)
         }
         try {
@@ -223,25 +206,20 @@ fun Context.setAppLocale(languageCode: String): Context {
             Log.e("AppLocaleConfig", "Error in AppCompatDelegate.setApplicationLocales: ${e.message}", e)
         }
     }
-
     val updatedContext = createConfigurationContext(config)
     Log.d("AppLocaleConfig", "Returning context with new locale: ${updatedContext.resources.configuration.locale}")
     return updatedContext
 }
-// --- КОНЕЦ УТИЛИТНОЙ ФУНКЦИИ ---
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DryDriveApp( viewModel: DryDriveViewModel ) {
-    val uiState by viewModel.uiState.collectAsState() // uiState теперь должен содержать currentLanguageCode
+    val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var selectedItemIndex by rememberSaveable { mutableStateOf(0) }
 
-    // Логируем код языка из uiState для проверки
     Log.d("DryDriveApp", "Recomposing DryDriveApp with lang code from uiState: ${uiState.currentLanguageCode}")
-
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -272,7 +250,7 @@ fun DryDriveApp( viewModel: DryDriveViewModel ) {
                 containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
                     DryDriveTopAppBar(
-                        uiState = uiState, // uiState передается как есть
+                        uiState = uiState,
                         onQueryChange = { query ->
                             viewModel.onEvent(DryDriveEvent.SearchQueryChanged(query))
                         },
@@ -309,7 +287,7 @@ fun DryDriveApp( viewModel: DryDriveViewModel ) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DryDriveTopAppBar(
-    uiState: DryDriveUiState, // uiState содержит currentLanguageCode
+    uiState: DryDriveUiState,
     onQueryChange: (String) -> Unit,
     onCitySelected: (City, String) -> Unit,
     onDismissSearch: () -> Unit,
@@ -321,7 +299,6 @@ fun DryDriveTopAppBar(
         title = {
             Box(modifier = Modifier.fillMaxWidth()) {
                 if (isCitySearchActiveInAppBar) {
-                    // ... (код OutlinedTextField без изменений) ...
                     OutlinedTextField(
                         value = uiState.searchQuery,
                         onValueChange = onQueryChange,
@@ -365,8 +342,6 @@ fun DryDriveTopAppBar(
                         Icon(Icons.Filled.LocationOn, contentDescription = stringResource(R.string.location_description), modifier = Modifier.size(dimensionResource(R.dimen.icon_size_medium)))
                         Spacer(modifier = Modifier.width(dimensionResource(R.dimen.spacing_small)))
                         Text(
-                            // uiState.cityForDisplay уже должен быть локализован ViewModel'ю
-                            // при выборе города, так как formattedName формируется с учетом языка
                             text = uiState.cityForDisplay.ifEmpty { stringResource(R.string.select_city_prompt) },
                             fontSize = dimensionResource(R.dimen.font_size_medium_emphasis).value.sp,
                             fontWeight = FontWeight.Medium,
@@ -391,13 +366,8 @@ fun DryDriveTopAppBar(
                 ) {
                     uiState.citySearchResults.forEach { city ->
                         DropdownMenuItem(
-                            text = {
-                                // ИСПОЛЬЗУЕМ uiState.currentLanguageCode
-                                Text(formatCityName(city, uiState.currentLanguageCode))
-                            },
+                            text = { Text(formatCityName(city, uiState.currentLanguageCode)) },
                             onClick = {
-                                // ИСПОЛЬЗУЕМ uiState.currentLanguageCode для формирования имени,
-                                // которое пойдет в ViewModel и затем в uiState.cityForDisplay
                                 val formattedName = formatCityName(city, uiState.currentLanguageCode)
                                 onCitySelected(city, formattedName)
                                 isCitySearchActiveInAppBar = false
@@ -407,7 +377,6 @@ fun DryDriveTopAppBar(
                 }
             }
         },
-        // ... (остальные параметры TopAppBar без изменений) ...
         actions = {
             if (isCitySearchActiveInAppBar) {
                 TextButton(onClick = { isCitySearchActiveInAppBar = false }) {
@@ -437,13 +406,11 @@ fun DryDriveBottomNavigationBar(
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit
 ) {
-    // ... (код без изменений, ошибка про item.icon - это отдельный вопрос, не связанный с языком) ...
     val items = listOf(
         BottomNavItem(stringResource(R.string.nav_home), Icons.Filled.Home),
         BottomNavItem(stringResource(R.string.nav_map), Icons.Filled.Place),
         BottomNavItem(stringResource(R.string.nav_settings), Icons.Filled.Settings)
     )
-
     NavigationBar {
         items.forEachIndexed { index, item ->
             NavigationBarItem(
@@ -458,7 +425,6 @@ fun DryDriveBottomNavigationBar(
 
 @Composable
 fun HomeScreenContent(modifier: Modifier = Modifier, uiState: DryDriveUiState) {
-    // ... (код без изменений) ...
     val carImageResId = when (uiState.weather?.weather?.getOrNull(0)?.main?.lowercase(Locale.ROOT)) {
         "rain", "snow", "thunderstorm", "drizzle", "mist", "fog" -> R.drawable.car_dirty
         else -> R.drawable.car_clean
@@ -563,13 +529,7 @@ fun MapScreenPlaceholder(modifier: Modifier = Modifier) {
 fun DryDriveAppPreview() {
     DryDriveTheme {
         Surface(color = MaterialTheme.colorScheme.background) {
-            // Для Preview может потребоваться фейковая ViewModel или передача uiState напрямую,
-            // если DryDriveViewModel() без Hilt не работает корректно в Preview.
-            // val previewViewModel: DryDriveViewModel = viewModel() // Убедитесь, что это работает в Preview
-            // DryDriveApp(viewModel = previewViewModel)
-            // ИЛИ:
-            DryDriveApp(viewModel = viewModel()) // Оставляем так, если работает
+            DryDriveApp(viewModel = viewModel())
         }
     }
 }
-
