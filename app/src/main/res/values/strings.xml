@@ -1,3 +1,59 @@
 <resources>
     <string name="app_name">DryDrive</string>
+
+    <!-- DryDriveScreen & TopAppBar -->
+    <string name="search_city_placeholder">Поиск города...</string>
+    <string name="clear_search_description">Очистить</string>
+    <string name="location_description">Местоположение</string>
+    <string name="select_city_prompt">Выберите город</string>
+    <string name="select_city_action">Выбрать город</string>
+    <string name="city_not_found">Город не найден</string>
+    <string name="action_ok">ОК</string>
+    <string name="action_search">Поиск</string>
+    <string name="action_menu">Меню</string>
+    <string name="drawer_menu_todo">Меню (TODO)</string>
+
+    <!-- Car Wash Recommendations -->
+    <string name="wash_not_recommended">Мойка не рекомендуется.</string>
+    <string name="wash_possible_limited_visibility">Можно помыть, но видимость ограничена.</string>
+    <string name="wash_great_day">Отличный день для мойки!</string>
+    <string name="wash_good_weather_but_cool">Погода хорошая, но прохладно для мойки.</string>
+    <string name="car_dirty_description">Грязный автомобиль</string>
+    <string name="car_clean_description">Чистый автомобиль</string>
+    <string name="city_background_description">Фон города</string>
+
+    <!-- Weather Details -->
+    <string name="weather_data_unavailable">Нет данных</string>
+
+    <!-- Forecast -->
+    <string name="forecast_now">Сейчас</string>
+    <string name="forecast_icon_description_template">%s погода</string> <!-- Для ForecastDayCard, если нужно осмысленное описание -->
+    <string name="forecast_unavailable">Прогноз недоступен</string>
+
+    <!-- Recommendations -->
+    <string name="rec_drink_water_default">Пейте воду</string>
+    <string name="rec_drink_water_active">Пейте воду!</string>
+    <string name="rec_drink_water_desc_default">Рекомендация: пить воду</string>
+    <string name="rec_drink_water_desc_active">Активная рекомендация: пить воду</string>
+
+    <string name="rec_uv_protection_default">Высокий УФ</string>
+    <string name="rec_uv_protection_active">Защита от УФ!</string>
+    <string name="rec_uv_protection_desc_default">Рекомендация: УФ защита</string>
+    <string name="rec_uv_protection_desc_active">Активная рекомендация: УФ защита</string>
+
+    <string name="rec_tire_change_default">Смена колес</string>
+    <string name="rec_tire_change_active">Заморозки!</string>
+    <string name="rec_tire_change_desc_default">Рекомендация: смена колес</string>
+    <string name="rec_tire_change_desc_active">Активная рекомендация: заморозки</string>
+
+    <string name="rec_umbrella_default">Возьмите зонт</string>
+    <string name="rec_umbrella_active">Нужен зонт!</string>
+    <string name="rec_umbrella_desc_default">Рекомендация: взять зонт</string>
+    <string name="rec_umbrella_desc_active">Активная рекомендация: взять зонт</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_map">Карта</string>
+    <string name="nav_settings">Настройки</string>
+
 </resources>
