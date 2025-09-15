@@ -8,15 +8,18 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
-import androidx.appcompat.app.AppCompatDelegate
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -47,14 +50,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ru.devsoland.drydrive.data.City
 import ru.devsoland.drydrive.data.preferences.AppLanguage
-// ИЗМЕНЕННЫЕ ИМПОРТЫ
-import ru.devsoland.drydrive.data.preferences.UserPreferencesManager // Было LanguageManager
-import ru.devsoland.drydrive.di.UserPreferencesEntryPoint // Было LanguageManagerEntryPoint
-// КОНЕЦ ИЗМЕНЕННЫХ ИМПОРТОВ
+import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
+import ru.devsoland.drydrive.di.UserPreferencesEntryPoint
 import ru.devsoland.drydrive.ui.composables.DailyForecastPlaceholder
 import ru.devsoland.drydrive.ui.composables.DailyForecastRow
+import ru.devsoland.drydrive.ui.composables.RecommendationsDisplaySection // ИСПРАВЛЕННЫЙ ИМПОРТ
 import ru.devsoland.drydrive.ui.composables.WeatherDetails
-import ru.devsoland.drydrive.ui.composables.WeatherRecommendationSection
 import ru.devsoland.drydrive.ui.settings.SettingsScreen
 import ru.devsoland.drydrive.ui.theme.CityBackgroundOverlay
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
@@ -62,19 +63,10 @@ import ru.devsoland.drydrive.ui.theme.SearchFieldBorderFocused
 import ru.devsoland.drydrive.ui.theme.SearchFieldBorderUnfocused
 import java.util.Locale
 
-// --- МОДЕЛИ И УТИЛИТЫ ---
-enum class RecommendationType { DRINK_WATER, UV_PROTECTION, TIRE_CHANGE, UMBRELLA }
-
-data class RecommendationSlot(
-    val type: RecommendationType,
-    val defaultIcon: ImageVector,
-    val activeIcon: ImageVector,
-    val defaultTextResId: Int,
-    val activeTextResId: Int,
-    val isActive: Boolean = false,
-    val defaultContentDescriptionResId: Int,
-    val activeContentDescriptionResId: Int
-)
+// --- УДАЛЕНЫ СТАРЫЕ МОДЕЛИ РЕКОМЕНДАЦИЙ ---
+// enum class RecommendationType { DRINK_WATER, UV_PROTECTION, TIRE_CHANGE, UMBRELLA }
+// data class RecommendationSlot(...)
+// --- КОНЕЦ УДАЛЕНИЯ ---
 
 fun formatCityName(city: City, currentAppLanguageCode: String): String {
     val displayName = when {
@@ -90,7 +82,6 @@ fun formatCityName(city: City, currentAppLanguageCode: String): String {
     } ?: city.name
     return "$displayName, ${city.country}" + if (city.state != null) ", ${city.state}" else ""
 }
-// --- КОНЕЦ МОДЕЛЕЙ ---
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -99,13 +90,13 @@ class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
         Log.d("MainActivityLifecycle", "attachBaseContext CALLED. Initial base context locale: ${newBase.resources.configuration.locale}")
 
-        val userPreferencesManager: UserPreferencesManager // ИЗМЕНЕНО: тип и имя переменной
+        val userPreferencesManager: UserPreferencesManager
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 newBase.applicationContext,
-                UserPreferencesEntryPoint::class.java // ИЗМЕНЕНО: используем новый EntryPoint
+                UserPreferencesEntryPoint::class.java
             )
-            userPreferencesManager = entryPoint.getUserPreferencesManager() // ИЗМЕНЕНО: вызываем новый метод
+            userPreferencesManager = entryPoint.getUserPreferencesManager()
             Log.d("MainActivityLifecycle", "UserPreferencesManager obtained successfully via EntryPoint.")
         } catch (e: IllegalStateException) {
             Log.e("MainActivityLifecycle", "Hilt not ready in attachBaseContext to get UserPreferencesManager: ${e.message}. Using default base context.", e)
@@ -120,7 +111,7 @@ class MainActivity : ComponentActivity() {
         val currentLanguageCode = try {
             Log.d("MainActivityLifecycle", "attachBaseContext: Attempting to get language code via runBlocking...")
             runBlocking {
-                userPreferencesManager.selectedLanguageFlow.first().code // ИЗМЕНЕНО: используем userPreferencesManager
+                userPreferencesManager.selectedLanguageFlow.first().code
             }
         } catch (e: Exception) {
             Log.e("MainActivityLifecycle", "Error getting language code in runBlocking for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.", e)
@@ -225,7 +216,7 @@ fun DryDriveApp( viewModel: DryDriveViewModel ) {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.systemBarsPadding(),
+                modifier = Modifier.systemBarsPadding(), // Учитываем системные бары
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerContentColor = MaterialTheme.colorScheme.onSurface
             ) {
@@ -238,16 +229,16 @@ fun DryDriveApp( viewModel: DryDriveViewModel ) {
         },
         scrimColor = MaterialTheme.colorScheme.scrim
     ) {
-        Surface(
+        Surface( // Обертка для основного контента, чтобы scrim корректно работал
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+            color = MaterialTheme.colorScheme.background // Фон для основного контента
         ) {
             Scaffold(
                 modifier = Modifier
                     .fillMaxSize()
-                    .navigationBarsPadding()
-                    .statusBarsPadding(),
-                containerColor = MaterialTheme.colorScheme.background,
+                    .navigationBarsPadding() // Отступ для навигационного бара
+                    .statusBarsPadding(), // Отступ для статус-бара
+                containerColor = MaterialTheme.colorScheme.background, // Явный цвет фона Scaffold
                 topBar = {
                     DryDriveTopAppBar(
                         uiState = uiState,
@@ -305,7 +296,7 @@ fun DryDriveTopAppBar(
                         label = { Text(stringResource(R.string.search_city_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(end = dimensionResource(R.dimen.spacing_large)),
+                            .padding(end = dimensionResource(R.dimen.spacing_large)), // Отступ справа для кнопки OK
                         singleLine = true,
                         textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = dimensionResource(R.dimen.font_size_medium_emphasis).value.sp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -337,7 +328,7 @@ fun DryDriveTopAppBar(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { isCitySearchActiveInAppBar = true }
-                            .padding(start = 0.dp)
+                            .padding(start = 0.dp) // Убрал отступ, чтобы иконка была ближе к краю
                     ) {
                         Icon(Icons.Filled.LocationOn, contentDescription = stringResource(R.string.location_description), modifier = Modifier.size(dimensionResource(R.dimen.icon_size_medium)))
                         Spacer(modifier = Modifier.width(dimensionResource(R.dimen.spacing_small)))
@@ -353,16 +344,17 @@ fun DryDriveTopAppBar(
                         Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(R.string.select_city_action))
                     }
                 }
+                // DropdownMenu для результатов поиска
                 DropdownMenu(
                     expanded = isCitySearchActiveInAppBar && uiState.citySearchResults.isNotEmpty() && uiState.searchQuery.isNotBlank(),
                     onDismissRequest = {
-                        isCitySearchActiveInAppBar = false
-                        onDismissSearch()
+                        isCitySearchActiveInAppBar = false // Закрываем поиск по клику вне меню
+                        onDismissSearch()                 // Сбрасываем результаты поиска
                     },
                     modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .align(Alignment.TopStart)
-                        .offset(y = 56.dp)
+                        .fillMaxWidth(0.9f) // Ширина выпадающего меню
+                        .align(Alignment.TopStart) // Выравнивание
+                        .offset(y = 56.dp) // Смещение вниз, чтобы не перекрывать TopAppBar
                 ) {
                     uiState.citySearchResults.forEach { city ->
                         DropdownMenuItem(
@@ -370,7 +362,7 @@ fun DryDriveTopAppBar(
                             onClick = {
                                 val formattedName = formatCityName(city, uiState.currentLanguageCode)
                                 onCitySelected(city, formattedName)
-                                isCitySearchActiveInAppBar = false
+                                isCitySearchActiveInAppBar = false // Закрываем поиск
                             }
                         )
                     }
@@ -379,7 +371,10 @@ fun DryDriveTopAppBar(
         },
         actions = {
             if (isCitySearchActiveInAppBar) {
-                TextButton(onClick = { isCitySearchActiveInAppBar = false }) {
+                TextButton(onClick = {
+                    isCitySearchActiveInAppBar = false
+                    onDismissSearch() // Также сбрасываем результаты при нажатии OK
+                }) {
                     Text(stringResource(R.string.action_ok), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                 }
             } else {
@@ -391,11 +386,11 @@ fun DryDriveTopAppBar(
             IconButton(onClick = onMenuClick) { Icon(imageVector = Icons.Filled.Menu, contentDescription = "Open navigation drawer") }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            scrolledContainerColor = MaterialTheme.colorScheme.surface,
-            navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface, // Цвет фона TopAppBar
+            scrolledContainerColor = MaterialTheme.colorScheme.surface, // Цвет фона при прокрутке
+            navigationIconContentColor = MaterialTheme.colorScheme.onSurface, // Цвет иконки навигации
+            titleContentColor = MaterialTheme.colorScheme.onSurface, // Цвет заголовка
+            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant // Цвет иконок действий
         )
     )
 }
@@ -418,6 +413,7 @@ fun DryDriveBottomNavigationBar(
                 onClick = { onItemSelected(index) },
                 icon = { Icon(item.icon, contentDescription = item.title) },
                 label = { Text(item.title) },
+                // colors = NavigationBarItemDefaults.colors(...) // Для кастомизации цветов элементов
             )
         }
     }
@@ -441,54 +437,97 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: DryDriveUiState) {
     Box(modifier = modifier
         .fillMaxSize()
         .background(MaterialTheme.colorScheme.background)) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()) // Добавил вертикальный скролл для всего контента
+        ) {
+            // Секция с фоном города и текущей погодой/машиной
             Box(modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)) {
-                Image(painter = painterResource(id = R.drawable.city_background), contentDescription = stringResource(R.string.city_background_description), modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                // .weight(1f) // weight не очень хорошо работает с verticalScroll, лучше задавать высоты явно или использовать minHeight
+                .aspectRatio(1f / 1.1f) // Примерное соотношение для этой секции, подберите по вкусу
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.city_background),
+                    contentDescription = stringResource(R.string.city_background_description),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
                 Box(modifier = Modifier
                     .fillMaxSize()
                     .background(CityBackgroundOverlay))
+
                 Column(modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))) {
                     Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_large)))
                     when {
-                        uiState.isLoadingWeather && uiState.weather == null -> CircularProgressIndicator(modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(vertical = 50.dp), color = MaterialTheme.colorScheme.primary)
-                        uiState.weatherErrorMessage != null && uiState.weather == null -> Text(text = uiState.weatherErrorMessage!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 50.dp))
+                        uiState.isLoadingWeather && uiState.weather == null -> CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(vertical = 50.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        uiState.weatherErrorMessage != null && uiState.weather == null -> Text(
+                            text = uiState.weatherErrorMessage!!,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 50.dp)
+                        )
                         uiState.weather != null -> {
                             WeatherDetails(weather = uiState.weather)
                             Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_medium)))
                             if (washRecommendation.isNotBlank()) {
-                                Text(text = washRecommendation, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = dimensionResource(R.dimen.font_size_caption).value.sp, modifier = Modifier.fillMaxWidth())
+                                Text(
+                                    text = washRecommendation,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = dimensionResource(R.dimen.font_size_caption).value.sp,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
-                        else -> Column(modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = stringResource(R.string.select_city_prompt), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 50.dp))
+                        else -> Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp), // Задаем высоту, чтобы Spacer.weight работал корректно
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = stringResource(R.string.select_city_prompt),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 50.dp)
+                            )
                         }
                     }
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.weight(1f)) // Занимает оставшееся место, чтобы машина была внизу
                     if (uiState.weather != null) {
-                        Image(painter = painterResource(id = carImageResId), contentDescription = carContentDescription, modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .aspectRatio(16f / 9f)
-                            .align(Alignment.CenterHorizontally)
-                            .padding(bottom = dimensionResource(R.dimen.spacing_large)), contentScale = ContentScale.Fit)
+                        Image(
+                            painter = painterResource(id = carImageResId),
+                            contentDescription = carContentDescription,
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .aspectRatio(16f / 9f)
+                                .align(Alignment.CenterHorizontally)
+                                .padding(bottom = dimensionResource(R.dimen.spacing_large)),
+                            contentScale = ContentScale.Fit
+                        )
                     }
                 }
             }
+
+            // Секция рекомендаций
             Column(modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))
                 .padding(top = dimensionResource(R.dimen.spacing_large))) {
-                WeatherRecommendationSection(weather = uiState.weather)
+                // ИСПРАВЛЕННЫЙ ВЫЗОВ:
+                RecommendationsDisplaySection(recommendations = uiState.recommendations)
             }
+
+            // Секция прогноза
             Column(modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))
@@ -497,19 +536,33 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: DryDriveUiState) {
                     bottom = dimensionResource(R.dimen.spacing_large)
                 )) {
                 when {
-                    uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp), contentAlignment = Alignment.Center) {
-                        DailyForecastPlaceholder()
+                    uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp), // Задаем высоту для плейсхолдера
+                        contentAlignment = Alignment.Center
+                    ) {
+                        DailyForecastPlaceholder() // Можно оставить или убрать, если CircularProgressIndicator достаточно
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
                     }
-                    uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty() -> Box(modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp), contentAlignment = Alignment.Center) {
-                        Text(text = stringResource(R.string.forecast_unavailable), color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                    uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty() -> Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.forecast_unavailable),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
                     }
-                    uiState.dailyForecasts.isNotEmpty() -> { DailyForecastRow(forecasts = uiState.dailyForecasts) }
-                    else -> { DailyForecastPlaceholder() }
+                    uiState.dailyForecasts.isNotEmpty() -> {
+                        DailyForecastRow(forecasts = uiState.dailyForecasts)
+                    }
+                    else -> { // Если нет ни загрузки, ни ошибки, ни данных - показываем плейсхолдер
+                        DailyForecastPlaceholder()
+                    }
                 }
             }
         }
@@ -529,7 +582,10 @@ fun MapScreenPlaceholder(modifier: Modifier = Modifier) {
 fun DryDriveAppPreview() {
     DryDriveTheme {
         Surface(color = MaterialTheme.colorScheme.background) {
-            DryDriveApp(viewModel = viewModel())
+            // Для превью можно создать фейковый ViewModel или передать null/пустой uiState, если ваш UI это обрабатывает
+            // Либо используйте hiltViewModel() для превью, если настроено.
+            val previewViewModel: DryDriveViewModel = viewModel()
+            DryDriveApp(viewModel = previewViewModel)
         }
     }
 }

@@ -1,142 +1,95 @@
 package ru.devsoland.drydrive.ui.composables
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme // ИМПОРТ ДЛЯ ДОСТУПА К ЦВЕТАМ ТЕМЫ
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color // Убедитесь, что импортирован androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp // Используйте по необходимости или dimensionResource
 import ru.devsoland.drydrive.R
-import ru.devsoland.drydrive.RecommendationSlot
-import ru.devsoland.drydrive.RecommendationType
-import ru.devsoland.drydrive.data.Weather
-// Удаляем импорты кастомных цветов
-// import ru.devsoland.drydrive.ui.theme.AppAccentBlue
-// import ru.devsoland.drydrive.ui.theme.TextOnDarkBackground
-// import ru.devsoland.drydrive.ui.theme.AppBarContentColorLowEmphasis
-import androidx.compose.ui.unit.dp // Можно удалить, если все dp через dimensionResource
-import androidx.compose.ui.unit.sp // Можно удалить, если все sp через dimensionResource
+import ru.devsoland.drydrive.Recommendation // ИМПОРТИРУЙТЕ ВАШ DATA CLASS ИЗ ViewModel
+
+// Старый WeatherRecommendationSection и RecommendationChip можно удалить или закомментировать,
+// если вы полностью переходите на новую систему.
 
 @Composable
-fun WeatherRecommendationSection(
-    weather: Weather?,
+fun RecommendationsDisplaySection( // Новое имя, чтобы не путать
+    recommendations: List<Recommendation>,
     modifier: Modifier = Modifier
 ) {
-    val recommendationSlots = remember {
-        listOf(
-            RecommendationSlot(
-                type = RecommendationType.DRINK_WATER,
-                defaultIcon = Icons.Filled.WaterDrop,
-                activeIcon = Icons.Filled.WaterDrop,
-                defaultTextResId = R.string.rec_drink_water_default,
-                activeTextResId = R.string.rec_drink_water_active,
-                isActive = false,
-                defaultContentDescriptionResId = R.string.rec_drink_water_desc_default,
-                activeContentDescriptionResId = R.string.rec_drink_water_desc_active
-            ),
-            RecommendationSlot(
-                type = RecommendationType.UV_PROTECTION,
-                defaultIcon = Icons.Outlined.WbSunny,
-                activeIcon = Icons.Filled.WbSunny,
-                defaultTextResId = R.string.rec_uv_protection_default,
-                activeTextResId = R.string.rec_uv_protection_active,
-                isActive = false,
-                defaultContentDescriptionResId = R.string.rec_uv_protection_desc_default,
-                activeContentDescriptionResId = R.string.rec_uv_protection_desc_active
-            ),
-            RecommendationSlot(
-                type = RecommendationType.TIRE_CHANGE,
-                defaultIcon = Icons.Filled.AcUnit,
-                activeIcon = Icons.Filled.AcUnit,
-                defaultTextResId = R.string.rec_tire_change_default,
-                activeTextResId = R.string.rec_tire_change_active,
-                isActive = false,
-                defaultContentDescriptionResId = R.string.rec_tire_change_desc_default,
-                activeContentDescriptionResId = R.string.rec_tire_change_desc_active
-            ),
-            RecommendationSlot(
-                type = RecommendationType.UMBRELLA,
-                defaultIcon = Icons.Filled.Umbrella,
-                activeIcon = Icons.Filled.Umbrella,
-                defaultTextResId = R.string.rec_umbrella_default,
-                activeTextResId = R.string.rec_umbrella_active,
-                isActive = false,
-                defaultContentDescriptionResId = R.string.rec_umbrella_desc_default,
-                activeContentDescriptionResId = R.string.rec_umbrella_desc_active
-            )
-        )
-    }
-    val updatedSlots = remember(weather, recommendationSlots) {
-        if (weather == null) {
-            recommendationSlots.map { it.copy(isActive = false) }
-        } else {
-            recommendationSlots.map { slot ->
-                val isActive = when (slot.type) {
-                    RecommendationType.DRINK_WATER -> weather.main.temp > 28
-                    RecommendationType.UV_PROTECTION -> weather.weather.any { it.main.contains("Clear", ignoreCase = true) } && weather.main.temp > 15
-                    RecommendationType.TIRE_CHANGE -> weather.main.temp < 5
-                    RecommendationType.UMBRELLA -> weather.weather.any { it.main.contains("Rain", ignoreCase = true) }
-                }
-                slot.copy(isActive = isActive)
+    if (recommendations.isNotEmpty()) {
+        // Можно использовать LazyRow для горизонтальной прокрутки, если их много,
+        // или FlowRow для переноса на следующую строку.
+        // Для простоты пока оставим Row, как у вас было, но лучше FlowRow.
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = dimensionResource(R.dimen.spacing_medium)),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            recommendations.forEach { recommendation ->
+                DynamicRecommendationChip(recommendation = recommendation)
             }
         }
-    }
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceAround
-    ) {
-        updatedSlots.forEach { slot -> RecommendationChip(slot = slot) }
     }
 }
 
 @Composable
-fun RecommendationChip(
-    slot: RecommendationSlot,
+fun DynamicRecommendationChip( // Новое имя
+    recommendation: Recommendation,
     modifier: Modifier = Modifier
 ) {
-    // Используем цвета из MaterialTheme.colorScheme
-    val activeColor = MaterialTheme.colorScheme.primary // Акцентный цвет для активного состояния
-    val defaultIconColor = MaterialTheme.colorScheme.onSurfaceVariant // Цвет для неактивной иконки
-    val defaultTextColor = MaterialTheme.colorScheme.onSurfaceVariant // Цвет для неактивного текста
-    val activeTextColor = MaterialTheme.colorScheme.onSurface // Цвет для активного текста (может быть таким же, как onSurfaceVariant, или более контрастным)
+    val currentAlpha = if (recommendation.isActive) recommendation.activeAlpha else recommendation.inactiveAlpha
+    val iconToShow = recommendation.icon // Иконка уже в Recommendation data class
+    val textToShow = recommendation.text // Текст уже в Recommendation data class
 
-    val iconToShow = if (slot.isActive) slot.activeIcon else slot.defaultIcon
-    val textToShow = stringResource(if (slot.isActive) slot.activeTextResId else slot.defaultTextResId)
-    val iconColor = if (slot.isActive) activeColor else defaultIconColor
-    val textColor = if (slot.isActive) activeTextColor else defaultTextColor
-    val contentDescription = stringResource(if (slot.isActive) slot.activeContentDescriptionResId else slot.defaultContentDescriptionResId)
+    // Цвет для иконки и текста
+    val currentTintColor = if (recommendation.isActive) {
+        recommendation.activeColor
+    } else {
+        // Для неактивных: использовать их activeColor, но с низкой альфой,
+        // или приглушенный цвет темы. Выберем первый вариант для цветных, но бледных.
+        recommendation.activeColor
+        // Альтернатива для неактивных (серые):
+        // MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val currentTextColor = if (recommendation.isActive) {
+        recommendation.activeColor // Текст тоже может быть в цвет иконки
+        // или MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant // Приглушенный цвет для неактивного текста
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.width(IntrinsicSize.Min) // IntrinsicSize.Min для автоматической ширины
+        modifier = modifier
+            .width(IntrinsicSize.Min) // Для автоматической ширины
+            .alpha(currentAlpha)      // Применяем общую прозрачность здесь
+            .padding(horizontal = dimensionResource(R.dimen.spacing_small)) // Небольшой отступ между чипами
     ) {
         Icon(
             imageVector = iconToShow,
-            contentDescription = contentDescription,
-            tint = iconColor,
+            contentDescription = textToShow, // Используем текст как описание для простоты
+            tint = currentTintColor, // Вот где используется ваш кастомный цвет
             modifier = Modifier.size(dimensionResource(R.dimen.icon_size_large))
         )
         Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_small)))
         Text(
             text = textToShow,
-            color = textColor,
-            fontSize = dimensionResource(R.dimen.font_size_small_caption).value.sp,
+            color = currentTextColor, // Цвет текста
+            // fontSize = dimensionResource(R.dimen.font_size_small_caption).value.sp,
+            style = MaterialTheme.typography.labelSmall, // Используем стиль темы
             textAlign = TextAlign.Center,
-            fontWeight = if (slot.isActive) FontWeight.Medium else FontWeight.Normal
-            // Можно также использовать MaterialTheme.typography.caption или bodySmall
-            // style = if (slot.isActive) MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
-            //         else MaterialTheme.typography.labelSmall,
-            // color = textColor // цвет будет применен из style, если он там есть, или явно
+            fontWeight = if (recommendation.isActive) FontWeight.Medium else FontWeight.Normal,
+            maxLines = 2 // Ограничим высоту текста, если он длинный
         )
     }
 }
-
