@@ -416,14 +416,13 @@ fun DryDriveBottomNavigationBar(
         BottomNavItem(stringResource(R.string.nav_settings), Icons.Filled.Settings)
     )
 
-    NavigationBar(/* ... */) {
+    NavigationBar {
         items.forEachIndexed { index, item -> // item здесь должен быть типа BottomNavItem
             NavigationBarItem(
                 selected = selectedIndex == index,
                 onClick = { onItemSelected(index) },
                 icon = { Icon(item.icon, contentDescription = item.title) }, // ОШИБКА ЗДЕСЬ
-                label = { Text(item.title) }, // И ЗДЕСЬ
-                // ...
+                label = { Text(item.title) },
             )
         }
     }

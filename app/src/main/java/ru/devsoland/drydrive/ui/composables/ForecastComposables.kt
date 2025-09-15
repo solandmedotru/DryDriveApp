@@ -19,9 +19,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import ru.devsoland.drydrive.DisplayDayWeather
 // import androidx.compose.ui.unit.dp // Можно удалить, если все dp через dimensionResource
 import ru.devsoland.drydrive.R
-import ru.devsoland.drydrive.ui.DisplayDayWeather
 // Удаляем импорты кастомных цветов
 // import ru.devsoland.drydrive.ui.theme.AppAccentBlue
 // import ru.devsoland.drydrive.ui.theme.AppCardBackgroundDark

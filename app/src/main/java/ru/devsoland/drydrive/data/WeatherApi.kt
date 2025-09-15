@@ -7,42 +7,45 @@ import retrofit2.Retrofit
 import retrofit2.http.GET
 import retrofit2.http.Query
 
+// Убедитесь, что импорты для Weather, City, ForecastResponse корректны,
+// если они находятся в этом же пакете, явные импорты не нужны.
+// import ru.devsoland.drydrive.data.Weather
+// import ru.devsoland.drydrive.data.City
+// import ru.devsoland.drydrive.data.ForecastResponse
+
 interface WeatherApi {
-    // Запрос текущей погоды (остается без изменений)
     @GET("data/2.5/weather")
     suspend fun getWeather(
-        @Query("q") city: String, // Используем имя города для этого запроса
+        @Query("q") city: String,
         @Query("appid") apiKey: String,
         @Query("units") units: String = "metric",
-        @Query("lang") lang: String = "ru"
-    ): Weather // Возвращает ваш существующий Weather data class
+        @Query("lang") lang: String? = null // ИЗМЕНЕНО: String? = null, убрано "ru" по умолчанию
+    ): Weather
 
-    // Поиск городов (остается без изменений)
     @GET("geo/1.0/direct")
     suspend fun searchCities(
         @Query("q") query: String,
         @Query("limit") limit: Int = 5,
-        @Query("appid") apiKey: String
-    ): List<City> // Возвращает ваш City data class
+        @Query("appid") apiKey: String,
+        @Query("lang") lang: String? = null // ДОБАВЛЕНО и ИЗМЕНЕНО: String? = null
+    ): List<City>
 
-    // НОВЫЙ МЕТОД: Запрос прогноза на 5 дней / 3 часа
-    // Для этого эндпоинта обычно требуются координаты lat/lon
     @GET("data/2.5/forecast")
     suspend fun getFiveDayForecast(
         @Query("lat") lat: Double,
         @Query("lon") lon: Double,
         @Query("appid") apiKey: String,
         @Query("units") units: String = "metric",
-        @Query("lang") lang: String = "ru"
-    ): ForecastResponse // Возвращает новый ForecastResponse data class
+        @Query("lang") lang: String? = null // ИЗМЕНЕНО: String? = null, убрано "ru" по умолчанию
+    ): ForecastResponse
 
     companion object {
         private const val BASE_URL = "https://api.openweathermap.org/"
 
         fun create(): WeatherApi {
             val json = Json {
-                ignoreUnknownKeys = true // Важно для обработки ответов с полями, которые мы не ожидаем
-                coerceInputValues = true // Если приходит null для non-nullable поля с дефолтным значением, будет использовано дефолтное
+                ignoreUnknownKeys = true
+                coerceInputValues = true
             }
             return Retrofit.Builder()
                 .baseUrl(BASE_URL)

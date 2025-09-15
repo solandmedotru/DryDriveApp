@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">DryDrive</string> <!-- Название приложения обычно не меняется или локализуется очень аккуратно -->
+    <string name="app_name">DryDrive</string> <!-- Application name usually doesn't change or is localized very carefully -->
 
     <!-- DryDriveScreen & TopAppBar -->
     <string name="search_city_placeholder">Search city...</string>
@@ -17,7 +17,7 @@
     <string name="wash_not_recommended">Washing not recommended.</string>
     <string name="wash_possible_limited_visibility">Washing possible, but visibility is limited.</string>
     <string name="wash_great_day">Great day for a wash!</string>
-    <string name="wash_good_weather_but_cool">Weather is good, but it\'s cool for washing.</string> <!-- Обратите внимание на экранирование апострофа -->
+    <string name="wash_good_weather_but_cool">Weather is good, but it\'s cool for washing.</string> <!-- Note the escaped apostrophe -->
     <string name="car_dirty_description">Dirty car</string>
     <string name="car_clean_description">Clean car</string>
     <string name="city_background_description">City background</string>
@@ -30,26 +30,26 @@
     <string name="forecast_icon_description_template">%s weather</string>
     <string name="forecast_unavailable">Forecast unavailable</string>
 
-    <!-- Recommendations (пример одной) -->
-    <string name="rec_drink_water_default">Пейте воду!</string>
-    <string name="rec_drink_water_active">Пейте воду!</string>
-    <string name="rec_drink_water_desc_default">Recommendation: Пейте воду!</string>
-    <string name="rec_drink_water_desc_active">Active recommendation: Пейте воду!</string>
+    <!-- Recommendations -->
+    <string name="rec_drink_water_default">Drink water!</string>
+    <string name="rec_drink_water_active">Drink water!</string>
+    <string name="rec_drink_water_desc_default">Recommendation: Drink water!</string>
+    <string name="rec_drink_water_desc_active">Active recommendation: Drink water!</string>
 
-    <string name="rec_uv_protection_default">Высокий UF</string>
-    <string name="rec_uv_protection_active">Защита от UF!</string>
-    <string name="rec_uv_protection_desc_default">Рекомендация: UF защита</string>
-    <string name="rec_uv_protection_desc_active">Активная рекомендация: UF защита</string>
+    <string name="rec_uv_protection_default">High UV</string>
+    <string name="rec_uv_protection_active">UV Protection!</string>
+    <string name="rec_uv_protection_desc_default">Recommendation: UV protection</string>
+    <string name="rec_uv_protection_desc_active">Active recommendation: UV protection</string>
 
-    <string name="rec_tire_change_default">Смена колес</string>
-    <string name="rec_tire_change_active">Заморозки!</string>
-    <string name="rec_tire_change_desc_default">Рекомендация: смена колес</string>
-    <string name="rec_tire_change_desc_active">Активная рекомендация: заморозки</string>
+    <string name="rec_tire_change_default">Tire change</string>
+    <string name="rec_tire_change_active">Frost!</string>
+    <string name="rec_tire_change_desc_default">Recommendation: tire change</string>
+    <string name="rec_tire_change_desc_active">Active recommendation: frost</string>
 
-    <string name="rec_umbrella_default">Возьмите зонт</string>
-    <string name="rec_umbrella_active">Нужен зонт!</string>
-    <string name="rec_umbrella_desc_default">Рекомендация: взять зонт</string>
-    <string name="rec_umbrella_desc_active">Активная рекомендация: взять зонт</string>
+    <string name="rec_umbrella_default">Take an umbrella</string>
+    <string name="rec_umbrella_active">Need an umbrella!</string>
+    <string name="rec_umbrella_desc_default">Recommendation: take an umbrella</string>
+    <string name="rec_umbrella_desc_active">Active recommendation: take an umbrella</string>
 
     <!-- Bottom Navigation -->
     <string name="nav_home">Home</string>
@@ -60,5 +60,5 @@
     <string name="language_english">English</string>
     <string name="settings_language_title">Application Language</string>
     <string name="map_screen_placeholder">Map (under development)</string>
-    <string name="language_system">English</string>
+    <string name="language_system">System</string> <!-- Changed from "English" to "System" for clarity if this is meant for system default -->
 </resources>

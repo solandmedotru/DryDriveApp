@@ -30,12 +30,14 @@ data class WeatherInfo( // Для /data/2.5/weather
 )
 
 @Serializable
-data class City( // Это ваш класс для поиска городов /geo/1.0/direct
-    val name: String,
+data class City(
+    val name: String, // Может быть на языке по умолчанию от API
     val lat: Double,
     val lon: Double,
     val country: String,
-    val state: String? = null
+    val state: String? = null,
+    @SerialName("local_names")
+    val localNames: Map<String, String>? = null // Карта локализованных имен { "en": "London", "ru": "Лондон" }
 )
 
 // --- НОВЫЕ или АДАПТИРОВАННЫЕ Data классы для /data/2.5/forecast ---
