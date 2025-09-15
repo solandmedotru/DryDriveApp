@@ -31,8 +31,8 @@ import ru.devsoland.drydrive.data.Weather
 import ru.devsoland.drydrive.data.WeatherApi
 import ru.devsoland.drydrive.data.preferences.AppLanguage
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
+// import java.util.Calendar
 import java.text.SimpleDateFormat
-// import java.util.Calendar // Не используется активно, можно удалить если нет других применений
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -58,7 +58,7 @@ data class DryDriveUiState(
     val dailyForecasts: List<DisplayDayWeather> = emptyList(),
     val isLoadingForecast: Boolean = false,
     val forecastErrorMessage: String? = null,
-    val currentLanguageCode: String = AppLanguage.SYSTEM.code,
+    val currentLanguageCode: String = AppLanguage.SYSTEM.code, // Initial will be overridden
     val isInitialLoading: Boolean = true
 )
 
@@ -85,46 +85,59 @@ class DryDriveViewModel @Inject constructor(
         const val DEFAULT_CITY_FALLBACK = "Moscow"
     }
 
+    // This StateFlow is primarily for observing language changes AFTER initial load
+    // or if other parts of the app need to observe it reactively via the ViewModel.
     val currentLanguage: StateFlow<AppLanguage> = userPreferencesManager.selectedLanguageFlow
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AppLanguage.defaultLanguage()
+            initialValue = AppLanguage.defaultLanguage() // This initial value might be briefly observed
         )
 
     private val _recreateActivityEvent = MutableSharedFlow<Unit>(replay = 0)
     val recreateActivityEvent: SharedFlow<Unit> = _recreateActivityEvent.asSharedFlow()
 
     init {
+        // This collector ensures uiState.currentLanguageCode is updated if language changes during app's lifecycle
         currentLanguage
             .onEach { appLang ->
                 _uiState.update { currentState ->
-                    currentState.copy(currentLanguageCode = appLang.code)
+                    if (currentState.currentLanguageCode != appLang.code) {
+                        Log.d("ViewModelInit", "UiState.currentLanguageCode updated via onEach from '${currentState.currentLanguageCode}' to: '${appLang.code}'")
+                        currentState.copy(currentLanguageCode = appLang.code)
+                    } else {
+                        currentState
+                    }
                 }
-                Log.d("ViewModelInit", "UiState.currentLanguageCode updated to: ${appLang.code}")
             }
             .launchIn(viewModelScope)
 
         initialLoadJob = viewModelScope.launch {
-            val initialLangCode = currentLanguage.first().code
+            // Get language DIRECTLY from Preferences Flow for reliable initialization
+            val savedLanguage: AppLanguage = userPreferencesManager.selectedLanguageFlow.first()
+            val initialLangCode = savedLanguage.code
+            Log.d("ViewModelInit", "Initial lang code DIRECTLY from prefs flow: '$initialLangCode'")
+
+            // Update uiState with this definitive initial language code immediately
             _uiState.update { it.copy(currentLanguageCode = initialLangCode, isInitialLoading = true) }
+            Log.d("ViewModelInit", "UiState.currentLanguageCode now (after direct read): '${_uiState.value.currentLanguageCode}'. About to load city.")
 
             val lastCity = userPreferencesManager.lastSelectedCityFlow.first()
             if (lastCity != null) {
-                Log.d("ViewModelInit", "Last selected city found: ${lastCity.name}")
+                Log.d("ViewModelInit", "Last selected city found: ${lastCity.name}. Lang for format: '$initialLangCode'")
                 val formattedName = formatCityNameInternal(lastCity, initialLangCode)
                 _uiState.update {
                     it.copy(
                         selectedCityObject = lastCity,
                         cityForDisplay = formattedName,
-                        searchQuery = formattedName,
-                        isInitialLoading = false
+                        searchQuery = formattedName
+                        // isInitialLoading will be set to false by fetchCurrentWeatherAndForecast
                     )
                 }
-                fetchCurrentWeatherAndForecast(lastCity)
+                fetchCurrentWeatherAndForecast(lastCity, initialLangCode.ifEmpty { null })
             } else {
-                Log.d("ViewModelInit", "No last selected city. Loading default: $DEFAULT_CITY_FALLBACK")
-                findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true)
+                Log.d("ViewModelInit", "No last selected city. Loading default: $DEFAULT_CITY_FALLBACK. Lang for search: '$initialLangCode'")
+                findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true, initialLangCode.ifEmpty { null })
             }
         }
     }
@@ -140,6 +153,7 @@ class DryDriveViewModel @Inject constructor(
 
     private fun getApiLangCode(): String? {
         val langCode = _uiState.value.currentLanguageCode
+        // Log.d("ViewModelGetApiLang", "getApiLangCode called. uiState.currentLanguageCode = '$langCode'")
         return if (langCode.isEmpty()) null else langCode
     }
 
@@ -150,10 +164,10 @@ class DryDriveViewModel @Inject constructor(
             DryDriveEvent.DismissCitySearchDropDown -> _uiState.update { it.copy(isSearchDropDownExpanded = false) }
             DryDriveEvent.RefreshWeatherClicked -> {
                 _uiState.value.selectedCityObject?.let {
-                    fetchCurrentWeatherAndForecast(it)
+                    fetchCurrentWeatherAndForecast(it) // explicitApiLang = null, uses getApiLangCode
                 } ?: run {
                     Log.d("ViewModelEvent", "Refresh clicked but no city selected. Loading default.")
-                    findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true)
+                    findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true) // explicitApiLang = null
                 }
             }
             DryDriveEvent.ClearWeatherErrorMessage -> _uiState.update { it.copy(weatherErrorMessage = null, forecastErrorMessage = null) }
@@ -181,24 +195,17 @@ class DryDriveViewModel @Inject constructor(
                         )
                     }
                 } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) {
-                        Log.w("ViewModelEvents", "Search for '$query' was cancelled.")
-                        _uiState.update { it.copy(isLoadingCities = false) }
-                    } else {
-                        Log.e("ViewModelEvents", "Error searching cities for '$query': ${e.message}", e)
-                        _uiState.update {
-                            it.copy(citySearchResults = emptyList(), isLoadingCities = false, citySearchErrorMessage = "$MSG_CITY_SEARCH_ERROR${e.message}")
-                        }
-                    }
+                    Log.e("ViewModelSearch", "Error searching cities: ${e.message}", e)
+                    _uiState.update { it.copy(isLoadingCities = false, citySearchErrorMessage = "$MSG_CITY_SEARCH_ERROR${e.message}")}
                 }
             }
         } else {
-            _uiState.update { it.copy(citySearchResults = emptyList(), isLoadingCities = false, isSearchDropDownExpanded = false) }
+            _uiState.update { it.copy(citySearchResults = emptyList(), isLoadingCities = false) }
         }
     }
 
     private fun handleCitySelected(city: City, formattedName: String) {
-        initialLoadJob?.cancel()
+        initialLoadJob?.cancel() // Cancel initial load if user selects a city
         _uiState.update {
             it.copy(
                 selectedCityObject = city,
@@ -208,70 +215,79 @@ class DryDriveViewModel @Inject constructor(
                 isSearchDropDownExpanded = false,
                 weatherErrorMessage = null,
                 forecastErrorMessage = null,
-                dailyForecasts = emptyList(),
-                isInitialLoading = false
+                dailyForecasts = emptyList(), // Clear previous forecast
+                isInitialLoading = false // User interaction implies initial load is done or overridden
             )
         }
-        fetchCurrentWeatherAndForecast(city)
+        fetchCurrentWeatherAndForecast(city) // explicitApiLang = null
         viewModelScope.launch {
             userPreferencesManager.saveLastSelectedCity(city)
         }
     }
 
-    private fun fetchCurrentWeatherAndForecast(city: City) {
+    private fun fetchCurrentWeatherAndForecast(city: City, explicitApiLang: String? = null) {
         viewModelScope.launch {
-            val apiLang = getApiLangCode()
+            val apiLang = explicitApiLang ?: getApiLangCode()
+            Log.d("ViewModelFetch", "Fetching weather for ${city.name}. API lang: '$apiLang' (explicit: '$explicitApiLang')")
+
             _uiState.update {
                 it.copy(isLoadingWeather = true, weather = null, weatherErrorMessage = null, isLoadingForecast = true, dailyForecasts = emptyList(), forecastErrorMessage = null)
             }
             var weatherFetchError: String? = null
             var forecastFetchError: String? = null
+            var fetchedWeatherUpdate: Weather? = null
+
             try {
-                val fetchedWeather = withContext(Dispatchers.IO) {
+                fetchedWeatherUpdate = withContext(Dispatchers.IO) {
                     weatherApi.getWeather(city = city.name, apiKey = apiKey, lang = apiLang)
                 }
-                _uiState.update { it.copy(weather = fetchedWeather) }
             } catch (e: Exception) {
+                Log.e("ViewModelFetch", "Error fetching current weather: ${e.message}", e)
                 weatherFetchError = if (e.message?.contains("404") == true) "$MSG_CITY_NOT_FOUND_WEATHER${city.name}" else "$MSG_WEATHER_LOAD_ERROR${e.message}"
             }
+
+            var processedForecastsUpdate: List<DisplayDayWeather> = emptyList()
             if (city.lat != 0.0 && city.lon != 0.0) {
                 try {
                     val forecastResponse = withContext(Dispatchers.IO) {
                         weatherApi.getFiveDayForecast(lat = city.lat, lon = city.lon, apiKey = apiKey, lang = apiLang)
                     }
-                    val processedForecasts = processForecastResponse(forecastResponse, apiLang)
-                    _uiState.update { it.copy(dailyForecasts = processedForecasts) }
+                    Log.d("ViewModelFetch", "Forecast API response received. Items: ${forecastResponse.list.size}")
+                    processedForecastsUpdate = processForecastResponse(forecastResponse, apiLang)
+                    Log.d("ViewModelFetch", "Processed ${processedForecastsUpdate.size} forecast items. First item label: ${processedForecastsUpdate.firstOrNull()?.dayShort}")
                 } catch (e: Exception) {
+                    Log.e("ViewModelFetch", "Error fetching/processing forecast: ${e.message}", e)
                     forecastFetchError = "$MSG_FORECAST_LOAD_ERROR${e.message}"
                 }
             } else {
+                Log.w("ViewModelFetch", "Skipping forecast: Lat/Lon for ${city.name} are 0.")
                 forecastFetchError = MSG_COORDINATES_NOT_FOUND
             }
+
             _uiState.update {
-                it.copy(isLoadingWeather = false, isLoadingForecast = false, weatherErrorMessage = weatherFetchError ?: it.weatherErrorMessage, forecastErrorMessage = forecastFetchError ?: it.forecastErrorMessage, isInitialLoading = false)
+                it.copy(
+                    weather = fetchedWeatherUpdate ?: it.weather, // Update weather only if successfully fetched
+                    dailyForecasts = processedForecastsUpdate,    // Update forecast
+                    isLoadingWeather = false,
+                    isLoadingForecast = false,
+                    weatherErrorMessage = weatherFetchError ?: it.weatherErrorMessage, // Preserve old error if new is null
+                    forecastErrorMessage = forecastFetchError ?: it.forecastErrorMessage,
+                    isInitialLoading = false
+                )
             }
+            Log.d("ViewModelFetch", "UiState updated with weather & forecasts. Forecast count in state: ${_uiState.value.dailyForecasts.size}")
         }
     }
 
     private fun processForecastResponse(response: ForecastResponse, apiLanguageCode: String?): List<DisplayDayWeather> {
         val dailyData = mutableMapOf<String, MutableList<ForecastListItem>>()
-
-        val displayLocale = when {
-            apiLanguageCode == null || apiLanguageCode.isEmpty() -> Locale.getDefault()
-            else -> Locale(apiLanguageCode)
-        }
-        Log.d("ProcessForecast", "--- Starting Forecast Processing ---")
-        Log.d("ProcessForecast", "Display Locale for dayOfWeekFormat: $displayLocale (derived from apiLang: $apiLanguageCode)")
-        Log.d("ProcessForecast", "Device Default Locale: ${Locale.getDefault()}, Default TimeZone: ${TimeZone.getDefault().id}")
+        val displayLocale = when { apiLanguageCode.isNullOrEmpty() -> Locale.getDefault() else -> Locale(apiLanguageCode) }
 
         val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
         inputFormat.timeZone = TimeZone.getTimeZone("UTC")
-
         val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
         dayKeyFormat.timeZone = TimeZone.getTimeZone("UTC")
-
         val dayOfWeekFormat = SimpleDateFormat("E", displayLocale)
-        Log.d("ProcessForecast", "dayOfWeekFormat TimeZone: ${dayOfWeekFormat.calendar.timeZone.id}")
 
         response.list.forEach { item ->
             try {
@@ -285,50 +301,36 @@ class DryDriveViewModel @Inject constructor(
             }
         }
 
-        Log.d("ProcessForecast", "Number of unique UTC days collected: ${dailyData.size}")
-        dailyData.keys.sorted().forEach { key ->
-            Log.d("ProcessForecast", "Collected UTC dayKey: $key, items: ${dailyData[key]?.size}")
-        }
-
         val displayForecasts = mutableListOf<DisplayDayWeather>()
+        val currentUtcDayKey = dayKeyFormat.format(Date())
+        Log.d("ProcessForecast", "Filtering forecast. Current UTC day key: $currentUtcDayKey. Total UTC days from API: ${dailyData.size}")
 
-        // Определяем текущий UTC день в формате "yyyy-MM-dd"
-        val currentUtcDayKey = dayKeyFormat.format(Date()) // Date() создаст текущий момент времени
-        Log.d("ProcessForecast", "Current UTC day key for filtering: $currentUtcDayKey")
 
         dailyData.entries
             .sortedBy { it.key }
-            // Фильтруем: берем только те UTC-дни, которые строго больше текущего UTC-дня
             .filter { entry -> entry.key > currentUtcDayKey }
-            .take(5) // Берем первые 5 таких дней
+            .take(5)
             .forEachIndexed { index, entry ->
                 val utcDayKey = entry.key
                 val dayItems = entry.value
                 val targetItem = dayItems.find { it.dtTxt.substring(11, 13) == "12" } ?: dayItems.firstOrNull()
-
-                Log.d("ProcessForecast", "Processing entry index $index (after filter): UTC DayKey = $utcDayKey")
+                // Log.d("ProcessForecast", "Processing entry index $index (after filter): UTC DayKey = $utcDayKey")
 
                 targetItem?.let { item ->
                     val itemUtcDate = inputFormat.parse(item.dtTxt)
-                    Log.d("ProcessForecast", "  TargetItem dt_txt (UTC): ${item.dtTxt}, Parsed itemUtcDate: $itemUtcDate")
-
+                    // Log.d("ProcessForecast", "  TargetItem dt_txt (UTC): ${item.dtTxt}, Parsed itemUtcDate: $itemUtcDate")
                     val dayLabel = itemUtcDate?.let { date ->
-                        val localFormattedDateForLabel = dayOfWeekFormat.format(date)
-                        Log.d("ProcessForecast", "    For itemUtcDate $date (UTC), dayOfWeekFormat generated label: '$localFormattedDateForLabel' (using passed displayLocale: $displayLocale and actual formatter TZ: ${dayOfWeekFormat.calendar.timeZone.id})")
-                        localFormattedDateForLabel.replaceFirstChar { char ->
+                        dayOfWeekFormat.format(date).replaceFirstChar { char ->
                             if (char.isLowerCase()) char.titlecase(displayLocale) else char.toString()
                         }
                     } ?: "???"
-
                     val iconRes = mapWeatherConditionToIcon(item.weather.firstOrNull()?.main, item.weather.firstOrNull()?.icon)
                     val temperature = "${item.main.temp.toInt()}°"
                     displayForecasts.add(DisplayDayWeather(dayLabel, iconRes, temperature))
-                    Log.d("ProcessForecast", "  Added to display: DayLabel='$dayLabel', Temp='$temperature'")
-                } ?: run {
-                    Log.w("ProcessForecast", "  No targetItem found for UTC DayKey = $utcDayKey")
+                    // Log.d("ProcessForecast", "  Added to display: DayLabel='$dayLabel', Temp='$temperature'")
                 }
             }
-        Log.d("ProcessForecast", "--- Finished Forecast Processing, DisplayForecasts count: ${displayForecasts.size} ---")
+        Log.d("ProcessForecast", "Finished processing. DisplayForecasts count: ${displayForecasts.size}")
         return displayForecasts
     }
 
@@ -338,11 +340,11 @@ class DryDriveViewModel @Inject constructor(
             "02d", "02n" -> R.drawable.ic_sun_filled
             "03d", "03n" -> R.drawable.ic_cloud
             "04d", "04n" -> R.drawable.ic_cloud
-            "09d", "09n" -> R.drawable.ic_sun_filled
-            "10d", "10n" -> R.drawable.ic_sun_filled
-            "11d", "11n" -> R.drawable.ic_sun_filled
-            "13d", "13n" -> R.drawable.ic_sun_filled
-            "50d", "50n" -> R.drawable.ic_sun_filled
+            "09d", "09n" -> R.drawable.ic_sun_filled // Consider R.drawable.ic_rain
+            "10d", "10n" -> R.drawable.ic_sun_filled // Consider R.drawable.ic_sun_rain
+            "11d", "11n" -> R.drawable.ic_sun_filled // Consider R.drawable.ic_thunderstorm
+            "13d", "13n" -> R.drawable.ic_sun_filled // Consider R.drawable.ic_snow
+            "50d", "50n" -> R.drawable.ic_sun_filled // Consider R.drawable.ic_fog
             else -> R.drawable.ic_cloud
         }
     }
@@ -356,16 +358,21 @@ class DryDriveViewModel @Inject constructor(
             }
 
             userPreferencesManager.saveSelectedLanguage(language)
+            // uiState.currentLanguageCode will be updated by the `currentLanguage.onEach` collector
 
             _uiState.value.selectedCityObject?.let { city ->
                 val newFormattedName = formatCityNameInternal(city, language.code)
+                val langForApi = language.code.ifEmpty { null }
                 _uiState.update {
-                    it.copy(cityForDisplay = newFormattedName, searchQuery = if (it.searchQuery == it.cityForDisplay && it.selectedCityObject?.name == city.name) newFormattedName else it.searchQuery)
+                    it.copy(
+                        cityForDisplay = newFormattedName,
+                        searchQuery = if (it.searchQuery == it.cityForDisplay && it.selectedCityObject?.name == city.name) newFormattedName else it.searchQuery
+                    )
                 }
-                fetchCurrentWeatherAndForecast(city)
+                fetchCurrentWeatherAndForecast(city, langForApi)
             } ?: run {
-                if (_uiState.value.cityForDisplay == DEFAULT_CITY_FALLBACK && _uiState.value.selectedCityObject == null) {
-                    findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true)
+                if (_uiState.value.selectedCityObject == null && _uiState.value.cityForDisplay.contains(DEFAULT_CITY_FALLBACK, ignoreCase = true) ) {
+                    findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true, language.code.ifEmpty { null })
                 }
             }
 
@@ -381,32 +388,50 @@ class DryDriveViewModel @Inject constructor(
         }
     }
 
-    private fun findCityByNameAndFetchWeatherInternal(cityName: String, isInitialOrFallback: Boolean = false) {
+    private fun findCityByNameAndFetchWeatherInternal(
+        cityName: String,
+        isInitialOrFallback: Boolean = false,
+        explicitApiLang: String? = null
+    ) {
         viewModelScope.launch {
             if (isInitialOrFallback) {
                 _uiState.update { it.copy(isLoadingWeather = true, isLoadingForecast = true, isInitialLoading = true) }
             }
-            val apiLang = getApiLangCode()
+            val langForCitySearch = explicitApiLang ?: getApiLangCode()
+            Log.d("ViewModelInternalSearch", "Searching city: '$cityName'. API lang for search: '$langForCitySearch'")
+
             try {
                 val cities = withContext(Dispatchers.IO) {
-                    weatherApi.searchCities(query = cityName, apiKey = apiKey, limit = 1, lang = apiLang)
+                    weatherApi.searchCities(query = cityName, apiKey = apiKey, limit = 1, lang = langForCitySearch)
                 }
-                cities.firstOrNull()?.let { city ->
-                    val langCodeForDisplay = _uiState.value.currentLanguageCode
-                    val formattedName = formatCityNameInternal(city, langCodeForDisplay)
+                cities.firstOrNull()?.let { foundCity ->
+                    val langForDisplay = explicitApiLang ?: _uiState.value.currentLanguageCode
+                    val formattedName = formatCityNameInternal(foundCity, langForDisplay)
+                    Log.d("ViewModelInternalSearch", "City found: ${foundCity.name}. Lang for display name: '$langForDisplay', Formatted: '$formattedName'")
+
                     _uiState.update {
-                        it.copy(selectedCityObject = city, cityForDisplay = formattedName, searchQuery = formattedName, isInitialLoading = false)
+                        it.copy(
+                            selectedCityObject = foundCity,
+                            cityForDisplay = formattedName,
+                            searchQuery = formattedName
+                        )
                     }
-                    fetchCurrentWeatherAndForecast(city)
+                    fetchCurrentWeatherAndForecast(foundCity, explicitApiLang) // Pass explicitApiLang for weather fetch
                     if (isInitialOrFallback) {
-                        userPreferencesManager.saveLastSelectedCity(city)
+                        userPreferencesManager.saveLastSelectedCity(foundCity)
                     }
                 } ?: run {
+                    Log.w("ViewModelInternalSearch", "City '$cityName' not found via API.")
                     _uiState.update {
-                        it.copy(cityForDisplay = if(it.cityForDisplay.isEmpty()) "$MSG_CITY_NOT_FOUND_WEATHER $cityName" else it.cityForDisplay, weatherErrorMessage = "$MSG_CITY_NOT_FOUND_WEATHER $cityName", isLoadingWeather = false, isLoadingForecast = false, isInitialLoading = false)
+                        it.copy(
+                            cityForDisplay = if(it.cityForDisplay.isEmpty()) "$MSG_CITY_NOT_FOUND_WEATHER $cityName" else it.cityForDisplay,
+                            weatherErrorMessage = "$MSG_CITY_NOT_FOUND_WEATHER $cityName",
+                            isLoadingWeather = false, isLoadingForecast = false, isInitialLoading = false
+                        )
                     }
                 }
             } catch (e: Exception) {
+                Log.e("ViewModelInternalSearch", "Error finding/fetching city '$cityName': ${e.message}", e)
                 _uiState.update {
                     it.copy(weatherErrorMessage = "$MSG_CITY_SEARCH_ERROR ${e.message}", isLoadingWeather = false, isLoadingForecast = false, isInitialLoading = false)
                 }
@@ -414,4 +439,3 @@ class DryDriveViewModel @Inject constructor(
         }
     }
 }
-
