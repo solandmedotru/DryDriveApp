@@ -56,4 +56,9 @@
     <string name="nav_map">Карта</string>
     <string name="nav_settings">Настройки</string>
 
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="settings_language_title">Язык приложения</string>
+    <string name="map_screen_placeholder">Карта (в разработке)</string>
+
 </resources>
