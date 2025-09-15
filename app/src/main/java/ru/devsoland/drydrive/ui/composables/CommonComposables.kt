@@ -6,45 +6,47 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme // ИМПОРТ ДЛЯ ДОСТУПА К ЦВЕТАМ ТЕМЫ
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-// NEW: Удаляем прямой импорт Color
-// import androidx.compose.ui.graphics.Color
+// import androidx.compose.ui.graphics.Color // Удаляем, если не используется для кастомных цветов
 import androidx.compose.ui.res.dimensionResource
 // import androidx.compose.ui.unit.dp // Можно удалить, если все dp через dimensionResource
-import ru.devsoland.drydrive.R // NEW: Импорт для R.dimen
-// NEW: Импорты для ваших кастомных цветов из Color.kt
-import ru.devsoland.drydrive.ui.theme.AppPlaceholderGray
-import ru.devsoland.drydrive.ui.theme.AppCardBackgroundDark
-// NEW: Импорт для AppDimens, если используете Kotlin-константы для размеров
-// import ru.devsoland.drydrive.ui.theme.AppDimens
+import ru.devsoland.drydrive.R
+// Удаляем импорты кастомных цветов для плейсхолдера и фона карточки
+// import ru.devsoland.drydrive.ui.theme.AppPlaceholderGray
+// import ru.devsoland.drydrive.ui.theme.AppCardBackgroundDark
+// import ru.devsoland.drydrive.ui.theme.AppDimens // Если используете
 
 @Composable
 fun DailyForecastPlaceholder(
     modifier: Modifier = Modifier
 ) {
-    // NEW: Используем цвета из Color.kt
-    val placeholderColor = AppPlaceholderGray
-    val cardBackgroundColor = AppCardBackgroundDark
+    // Используем цвета из MaterialTheme.colorScheme для плейсхолдера и фона карточки
+    // Цвет плейсхолдера: обычно это приглушенный цвет на фоне поверхности.
+    // MaterialTheme.colorScheme.surfaceVariant или surface.copy(alpha = 0.3f) могут подойти.
+    // Для большей универсальности можно использовать onSurface с низкой альфой.
+    val placeholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f) // Стандартная альфа для Disabled/Placeholder
+    // Фон карточки для плейсхолдера должен быть похож на фон обычной карточки прогноза
+    val cardBackgroundColor = MaterialTheme.colorScheme.surfaceVariant
 
-    // NEW: Используем размеры из dimens.xml или AppDimens.kt
-    val cardShape = RoundedCornerShape(dimensionResource(R.dimen.corner_radius_medium)) // Например, 12dp
+
+    val cardShape = RoundedCornerShape(dimensionResource(R.dimen.corner_radius_medium))
     val cardModifier = Modifier
-        .width(dimensionResource(R.dimen.forecast_card_width))    // Например, 80dp
-        .height(dimensionResource(R.dimen.forecast_card_height)) // Например, 120dp
+        .width(dimensionResource(R.dimen.forecast_card_width))
+        .height(dimensionResource(R.dimen.forecast_card_height))
 
-    // Размеры для элементов плейсхолдера
-    val placeholderTextHeight = dimensionResource(R.dimen.placeholder_text_width) // Например, 16dp
-    val placeholderTextShortWidth = dimensionResource(R.dimen.placeholder_text_short_width) // Например, 40dp
-    val placeholderTextMediumWidth = dimensionResource(R.dimen.placeholder_text_medium_width) // Например, 30dp (для нижней температуры)
-    val placeholderIconSize = dimensionResource(R.dimen.placeholder_icon_size) // Например, 36dp
-    val placeholderCornerRadius = dimensionResource(R.dimen.corner_radius_small) // Например, 4dp
+    val placeholderTextHeight = dimensionResource(R.dimen.placeholder_text_width)
+    val placeholderTextShortWidth = dimensionResource(R.dimen.placeholder_text_short_width)
+    val placeholderTextMediumWidth = dimensionResource(R.dimen.placeholder_text_medium_width)
+    val placeholderIconSize = dimensionResource(R.dimen.placeholder_icon_size)
+    val placeholderCornerRadius = dimensionResource(R.dimen.corner_radius_small)
 
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_medium_large)) // Например, 12dp
+        horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_medium_large))
     ) {
         repeat(5) {
             Card(
@@ -56,8 +58,8 @@ fun DailyForecastPlaceholder(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(
-                            vertical = dimensionResource(R.dimen.spacing_large),   // Например, 16dp
-                            horizontal = dimensionResource(R.dimen.spacing_medium) // Например, 8dp
+                            vertical = dimensionResource(R.dimen.spacing_large),
+                            horizontal = dimensionResource(R.dimen.spacing_medium)
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween
@@ -79,7 +81,7 @@ fun DailyForecastPlaceholder(
                         modifier = Modifier
                             .size(
                                 width = placeholderTextMediumWidth,
-                                height = placeholderTextHeight // Можно использовать тот же placeholderTextHeight или отдельный
+                                height = placeholderTextHeight
                             )
                             .background(placeholderColor, RoundedCornerShape(placeholderCornerRadius))
                     )

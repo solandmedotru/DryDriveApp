@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme // ИМПОРТ ДЛЯ ДОСТУПА К ЦВЕТАМ ТЕМЫ
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -18,9 +19,10 @@ import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.RecommendationSlot
 import ru.devsoland.drydrive.RecommendationType
 import ru.devsoland.drydrive.data.Weather
-import ru.devsoland.drydrive.ui.theme.AppAccentBlue
-import ru.devsoland.drydrive.ui.theme.TextOnDarkBackground
-import ru.devsoland.drydrive.ui.theme.AppBarContentColorLowEmphasis // Или TextOnDarkBackgroundLowEmphasis
+// Удаляем импорты кастомных цветов
+// import ru.devsoland.drydrive.ui.theme.AppAccentBlue
+// import ru.devsoland.drydrive.ui.theme.TextOnDarkBackground
+// import ru.devsoland.drydrive.ui.theme.AppBarContentColorLowEmphasis
 import androidx.compose.ui.unit.dp // Можно удалить, если все dp через dimensionResource
 import androidx.compose.ui.unit.sp // Можно удалить, если все sp через dimensionResource
 
@@ -29,17 +31,17 @@ fun WeatherRecommendationSection(
     weather: Weather?,
     modifier: Modifier = Modifier
 ) {
-    val recommendationSlots = remember { // Теперь здесь НЕТ вызовов stringResource
+    val recommendationSlots = remember {
         listOf(
             RecommendationSlot(
                 type = RecommendationType.DRINK_WATER,
                 defaultIcon = Icons.Filled.WaterDrop,
                 activeIcon = Icons.Filled.WaterDrop,
-                defaultTextResId = R.string.rec_drink_water_default,     // << ПЕРЕДАЕМ ID
-                activeTextResId = R.string.rec_drink_water_active,       // << ПЕРЕДАЕМ ID
+                defaultTextResId = R.string.rec_drink_water_default,
+                activeTextResId = R.string.rec_drink_water_active,
                 isActive = false,
-                defaultContentDescriptionResId = R.string.rec_drink_water_desc_default, // << ПЕРЕДАЕМ ID
-                activeContentDescriptionResId = R.string.rec_drink_water_desc_active     // << ПЕРЕДАЕМ ID
+                defaultContentDescriptionResId = R.string.rec_drink_water_desc_default,
+                activeContentDescriptionResId = R.string.rec_drink_water_desc_active
             ),
             RecommendationSlot(
                 type = RecommendationType.UV_PROTECTION,
@@ -101,19 +103,21 @@ fun RecommendationChip(
     slot: RecommendationSlot,
     modifier: Modifier = Modifier
 ) {
-    val accentColor = AppAccentBlue
-    val defaultIconColor = AppBarContentColorLowEmphasis // Убедитесь, что этот цвет подходит
-    val defaultTextColor = AppBarContentColorLowEmphasis // или TextOnDarkBackgroundLowEmphasis
+    // Используем цвета из MaterialTheme.colorScheme
+    val activeColor = MaterialTheme.colorScheme.primary // Акцентный цвет для активного состояния
+    val defaultIconColor = MaterialTheme.colorScheme.onSurfaceVariant // Цвет для неактивной иконки
+    val defaultTextColor = MaterialTheme.colorScheme.onSurfaceVariant // Цвет для неактивного текста
+    val activeTextColor = MaterialTheme.colorScheme.onSurface // Цвет для активного текста (может быть таким же, как onSurfaceVariant, или более контрастным)
 
     val iconToShow = if (slot.isActive) slot.activeIcon else slot.defaultIcon
     val textToShow = stringResource(if (slot.isActive) slot.activeTextResId else slot.defaultTextResId)
-    val iconColor = if (slot.isActive) accentColor else defaultIconColor
-    val textColor = if (slot.isActive) TextOnDarkBackground else defaultTextColor
+    val iconColor = if (slot.isActive) activeColor else defaultIconColor
+    val textColor = if (slot.isActive) activeTextColor else defaultTextColor
     val contentDescription = stringResource(if (slot.isActive) slot.activeContentDescriptionResId else slot.defaultContentDescriptionResId)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.width(IntrinsicSize.Min) // IntrinsicSize.Min хорошо для автоматической ширины
+        modifier = modifier.width(IntrinsicSize.Min) // IntrinsicSize.Min для автоматической ширины
     ) {
         Icon(
             imageVector = iconToShow,
@@ -128,6 +132,11 @@ fun RecommendationChip(
             fontSize = dimensionResource(R.dimen.font_size_small_caption).value.sp,
             textAlign = TextAlign.Center,
             fontWeight = if (slot.isActive) FontWeight.Medium else FontWeight.Normal
+            // Можно также использовать MaterialTheme.typography.caption или bodySmall
+            // style = if (slot.isActive) MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
+            //         else MaterialTheme.typography.labelSmall,
+            // color = textColor // цвет будет применен из style, если он там есть, или явно
         )
     }
 }
+

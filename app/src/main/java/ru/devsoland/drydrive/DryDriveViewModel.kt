@@ -8,7 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -24,6 +26,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import javax.inject.Inject
+import ru.devsoland.drydrive.data.preferences.AppLanguage
+import ru.devsoland.drydrive.data.preferences.LanguageManager
 
 data class DryDriveUiState(
     val weather: Weather? = null,
@@ -51,7 +55,8 @@ data class DisplayDayWeather(
 
 @HiltViewModel
 class DryDriveViewModel @Inject constructor(
-    private val weatherApi: WeatherApi
+    private val weatherApi: WeatherApi,
+    private val languageManager: LanguageManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DryDriveUiState())
@@ -67,6 +72,21 @@ class DryDriveViewModel @Inject constructor(
         const val MSG_WEATHER_LOAD_ERROR = "Ошибка при загрузке погоды: "
         const val MSG_FORECAST_LOAD_ERROR = "Ошибка загрузки прогноза: " // Для ошибок прогноза
     }
+
+    /**
+     * StateFlow, предоставляющий текущий выбранный язык приложения.
+     * Он инициализируется текущим языком из LanguageManager (который читает из DataStore
+     * или возвращает язык по умолчанию).
+     */
+    val currentLanguage: StateFlow<AppLanguage> = languageManager.selectedLanguageFlow
+        .stateIn(
+            scope = viewModelScope, // Область действия корутин ViewModel
+            started = SharingStarted.WhileSubscribed(5000), // Начинает сбор, когда есть подписчики, и останавливает через 5с после последнего
+            initialValue = AppLanguage.defaultLanguage() // Начальное значение до первого эмита из flow
+            // Можно также попробовать languageManager.getCurrentAppLanguageBlocking()
+            // если бы у нас был такой синхронный метод, но с Flow лучше так.
+            // selectedLanguageFlow из DataStore сам вернет дефолтное значение, если ничего нет.
+        )
 
     init {
         _uiState.update { it.copy(searchQuery = it.cityForDisplay) }
@@ -294,6 +314,19 @@ class DryDriveViewModel @Inject constructor(
             "13d", "13n" -> R.drawable.ic_sun_filled
             "50d", "50n" -> R.drawable.ic_sun_filled
             else -> R.drawable.ic_cloud // Иконка по умолчанию
+        }
+    }
+
+    /**
+     * Вызывается, когда пользователь выбирает новый язык в настройках.
+     * Сохраняет выбор с помощью LanguageManager.
+     * @param language Выбранный AppLanguage.
+     */
+    fun onLanguageSelected(language: AppLanguage) {
+        viewModelScope.launch {
+            languageManager.saveSelectedLanguage(language)
+            // Пока что мы НЕ вызываем здесь recreate() или что-то подобное.
+            // Мы просто сохраняем выбор. Применение будет на следующем этапе.
         }
     }
 }

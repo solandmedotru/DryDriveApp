@@ -5,5 +5,11 @@ import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class DryDriveApplication : Application() {
-    // Можно добавить логику инициализации здесь, если потребуется позже
+
+    override fun onCreate() {
+        super.onCreate()
+        // На данный момент здесь ничего не делаем,
+        // связанного с языком. Это будет добавлено позже.
+        // Hilt будет инициализирован благодаря аннотации @HiltAndroidApp.
+    }
 }

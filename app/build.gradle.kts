@@ -68,6 +68,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3") // Обновлено
     implementation("androidx.activity:activity-compose:1.11.0") // Последняя версия
 
+    implementation("com.google.android.material:material:1.13.0")
+// Или более новая версия
+
     //Иконки
     implementation("androidx.compose.material:material-icons-core:1.7.8") // Основные иконки (обычно уже есть как транзитивная)
     implementation("androidx.compose.material:material-icons-extended:1.7.8") // Расширенный набор

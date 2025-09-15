@@ -1,0 +1,63 @@
+<resources>
+    <string name="app_name">DryDrive</string> <!-- Название приложения обычно не меняется или локализуется очень аккуратно -->
+
+    <!-- DryDriveScreen & TopAppBar -->
+    <string name="search_city_placeholder">Search city...</string>
+    <string name="clear_search_description">Clear</string>
+    <string name="location_description">Location</string>
+    <string name="select_city_prompt">Select city</string>
+    <string name="select_city_action">Select city</string>
+    <string name="city_not_found">City not found</string>
+    <string name="action_ok">OK</string>
+    <string name="action_search">Search</string>
+    <string name="action_menu">Menu</string>
+    <string name="drawer_menu_todo">Menu (TODO)</string>
+
+    <!-- Car Wash Recommendations -->
+    <string name="wash_not_recommended">Washing not recommended.</string>
+    <string name="wash_possible_limited_visibility">Washing possible, but visibility is limited.</string>
+    <string name="wash_great_day">Great day for a wash!</string>
+    <string name="wash_good_weather_but_cool">Weather is good, but it\'s cool for washing.</string> <!-- Обратите внимание на экранирование апострофа -->
+    <string name="car_dirty_description">Dirty car</string>
+    <string name="car_clean_description">Clean car</string>
+    <string name="city_background_description">City background</string>
+
+    <!-- Weather Details -->
+    <string name="weather_data_unavailable">No data</string>
+
+    <!-- Forecast -->
+    <string name="forecast_now">Now</string>
+    <string name="forecast_icon_description_template">%s weather</string>
+    <string name="forecast_unavailable">Forecast unavailable</string>
+
+    <!-- Recommendations (пример одной) -->
+    <string name="rec_drink_water_default">Drink water</string>
+    <string name="rec_drink_water_active">Drink water!</string>
+    <string name="rec_drink_water_desc_default">Recommendation: drink water</string>
+    <string name="rec_drink_water_desc_active">Active recommendation: drink water</string>
+
+    <string name="rec_uv_protection_default">Высокий УФ</string>
+    <string name="rec_uv_protection_active">Защита от УФ!</string>
+    <string name="rec_uv_protection_desc_default">Рекомендация: УФ защита</string>
+    <string name="rec_uv_protection_desc_active">Активная рекомендация: УФ защита</string>
+
+    <string name="rec_tire_change_default">Смена колес</string>
+    <string name="rec_tire_change_active">Заморозки!</string>
+    <string name="rec_tire_change_desc_default">Рекомендация: смена колес</string>
+    <string name="rec_tire_change_desc_active">Активная рекомендация: заморозки</string>
+
+    <string name="rec_umbrella_default">Возьмите зонт</string>
+    <string name="rec_umbrella_active">Нужен зонт!</string>
+    <string name="rec_umbrella_desc_default">Рекомендация: взять зонт</string>
+    <string name="rec_umbrella_desc_active">Активная рекомендация: взять зонт</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="language_russian">Russian</string>
+    <string name="language_english">English</string>
+    <string name="settings_language_title">Application Language</string>
+    <string name="map_screen_placeholder">Map (under development)</string>
+</resources>
