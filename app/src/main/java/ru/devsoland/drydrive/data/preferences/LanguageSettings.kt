@@ -1,5 +1,6 @@
 package ru.devsoland.drydrive.data.preferences
 
+import androidx.annotation.StringRes
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ru.devsoland.drydrive.R // Важно: импорт вашего R класса для доступа к строковым ресурсам
 
@@ -16,23 +17,19 @@ internal object LanguageKeys {
  * @param code Код языка (ISO 639-1).
  * @param displayNameResId ID строкового ресурса для отображаемого имени языка.
  */
-enum class AppLanguage(val code: String, val displayNameResId: Int) {
-    RUSSIAN("ru", R.string.language_russian), // Используем строки, добавленные на Шаге 1.1
-    ENGLISH("en", R.string.language_english); // Используем строки, добавленные на Шаге 1.1
+enum class AppLanguage(val code: String, @StringRes val displayNameResId: Int) {
+    SYSTEM("", R.string.language_system), // <<--- ДОБАВЛЕНО: Пустой код для системного языка
+    RUSSIAN("ru", R.string.language_russian),
+    ENGLISH("en", R.string.language_english);
 
     companion object {
-        /**
-         * Возвращает экземпляр AppLanguage по коду языка.
-         * Если код null или не найден, возвращает язык по умолчанию.
-         */
         fun fromCode(code: String?): AppLanguage {
-            return entries.find { it.code == code } ?: defaultLanguage()
+            if (code == null || code.isEmpty()) { // "" (пустой код) это SYSTEM
+                return SYSTEM
+            }
+            return entries.find { it.code == code && it != SYSTEM } ?: SYSTEM // Если код не стандартный, возвращаем SYSTEM
         }
-
-        /**
-         * Возвращает язык приложения по умолчанию.
-         */
-        fun defaultLanguage(): AppLanguage = RUSSIAN
+        // По умолчанию приложение будет использовать системный язык
+        fun defaultLanguage(): AppLanguage = SYSTEM
     }
 }
-

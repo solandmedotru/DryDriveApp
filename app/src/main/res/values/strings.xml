@@ -60,5 +60,6 @@
     <string name="language_english">English</string>
     <string name="settings_language_title">Язык приложения</string>
     <string name="map_screen_placeholder">Карта (в разработке)</string>
+    <string name="language_system">Русский</string>
 
 </resources>

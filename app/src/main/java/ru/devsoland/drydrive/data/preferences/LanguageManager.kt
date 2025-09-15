@@ -1,55 +1,72 @@
-package ru.devsoland.drydrive.data.preferences
+package ru.devsoland.drydrive.data.preferences // Убедитесь, что AppLanguage здесь или импортируется
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
+import android.util.Log
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Создаем DataStore Preferences instance на уровне файла (top-level).
-// Имя "app_settings" будет использоваться для файла настроек.
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
+// Если AppLanguage находится в этом же пакете (ru.devsoland.drydrive.data.preferences),
+// явный импорт ru.devsoland.drydrive.data.preferences.AppLanguage не нужен.
+// Если он в другом месте, убедитесь, что импорт есть.
+// В вашем случае, AppLanguage находится в LanguageSettings.kt в ТОМ ЖЕ ПАКЕТЕ,
+// так что явный импорт не требуется.
+
+// Context.appPreferencesDataStore должен быть определен на уровне файла (top-level)
+// или как часть объекта-компаньона, если вы хотите ограничить его видимость.
+// Определение на уровне файла - обычная практика.
+private val Context.appPreferencesDataStore by preferencesDataStore(name = "app_settings_drydrive") // Рекомендую добавить префикс к имени файла DataStore
 
 @Singleton
 class LanguageManager @Inject constructor(@ApplicationContext private val context: Context) {
 
+    // Используем ключи из LanguageSettings.LanguageKeys
+    // Это предпочтительнее, чем дублировать определение ключа.
+    // Убедитесь, что LanguageKeys в LanguageSettings.kt имеет видимость internal или public.
+    // Если LanguageKeys internal, и LanguageManager в том же модуле, все будет ОК.
+
     /**
-     * Flow, который эмитит текущий выбранный AppLanguage при его изменении в DataStore.
-     * Если язык не был сохранен, вернет язык по умолчанию.
+     * Flow, предоставляющий текущий выбранный AppLanguage.
+     * Использует AppLanguage.fromCode(), который корректно обрабатывает null (не сохранено)
+     * или пустую строку (сохранен системный язык), возвращая AppLanguage.SYSTEM.
      */
-    val selectedLanguageFlow: Flow<AppLanguage> = context.dataStore.data
+    val selectedLanguageFlow: Flow<AppLanguage> = context.appPreferencesDataStore.data
+        .catch { exception ->
+            // Важно обрабатывать исключения, особенно IOException для DataStore
+            if (exception is IOException) {
+                Log.e("LanguageManager", "IOException while reading language preferences.", exception)
+                emit(emptyPreferences()) // Возвращаем пустые preferences, чтобы map мог вернуть default/SYSTEM язык
+            } else {
+                Log.e("LanguageManager", "Unexpected error reading language preferences.", exception)
+                throw exception // Перебрасываем другие, неизвестные исключения
+            }
+        }
         .map { preferences ->
-            val langCode = preferences[LanguageKeys.SELECTED_LANGUAGE_CODE] // Используем ключ из LanguageSettings.kt
-            AppLanguage.fromCode(langCode) // Преобразуем код в AppLanguage
+            // Используем ключ из общего объекта LanguageKeys
+            val languageCode = preferences[LanguageKeys.SELECTED_LANGUAGE_CODE]
+            Log.d("LanguageManager", "Read language code from DataStore: '$languageCode'")
+            val selectedLang = AppLanguage.fromCode(languageCode) // fromCode уже корректно обрабатывает null/empty
+            Log.d("LanguageManager", "Mapped to AppLanguage: ${selectedLang.name} (code: '${selectedLang.code}')")
+            selectedLang
         }
 
     /**
      * Сохраняет выбранный язык (его код) в DataStore.
-     * @param language Язык для сохранения.
+     * Для AppLanguage.SYSTEM сохраняется пустая строка (согласно AppLanguage.SYSTEM.code).
      */
     suspend fun saveSelectedLanguage(language: AppLanguage) {
-        context.dataStore.edit { settings ->
-            settings[LanguageKeys.SELECTED_LANGUAGE_CODE] = language.code
+        context.appPreferencesDataStore.edit { preferences ->
+            // Используем ключ из общего объекта LanguageKeys
+            preferences[LanguageKeys.SELECTED_LANGUAGE_CODE] = language.code
+            Log.d("LanguageManager", "Saved language code to DataStore: '${language.code}' for language ${language.name}")
         }
     }
-
-    /**
-     * Вспомогательная Composable функция для получения отображаемого имени языка.
-     * ПРИМЕЧАНИЕ: Мы ее добавим позже, когда будем делать UI, чтобы не было ошибок компиляции,
-     * если у вас еще нет Compose зависимостей или LocalContext в этом модуле.
-     * Пока что ее можно закомментировать или не добавлять.
-     */
-    /*
-    @Composable
-    @ReadOnlyComposable
-    fun appLanguageDisplayName(language: AppLanguage): String {
-        return LocalContext.current.getString(language.displayNameResId)
-    }
-    */
 }
-

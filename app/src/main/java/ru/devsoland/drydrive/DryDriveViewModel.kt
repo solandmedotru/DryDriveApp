@@ -1,6 +1,9 @@
 package ru.devsoland.drydrive
 
+import android.os.Build
 import android.util.Log
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +31,9 @@ import java.util.TimeZone
 import javax.inject.Inject
 import ru.devsoland.drydrive.data.preferences.AppLanguage
 import ru.devsoland.drydrive.data.preferences.LanguageManager
+import kotlinx.coroutines.flow.MutableSharedFlow // <<--- НОВЫЙ ИМПОРТ
+import kotlinx.coroutines.flow.SharedFlow       // <<--- НОВЫЙ ИМПОРТ
+import kotlinx.coroutines.flow.asSharedFlow     // <<--- НОВЫЙ ИМПОРТ
 
 data class DryDriveUiState(
     val weather: Weather? = null,
@@ -80,13 +86,15 @@ class DryDriveViewModel @Inject constructor(
      */
     val currentLanguage: StateFlow<AppLanguage> = languageManager.selectedLanguageFlow
         .stateIn(
-            scope = viewModelScope, // Область действия корутин ViewModel
-            started = SharingStarted.WhileSubscribed(5000), // Начинает сбор, когда есть подписчики, и останавливает через 5с после последнего
-            initialValue = AppLanguage.defaultLanguage() // Начальное значение до первого эмита из flow
-            // Можно также попробовать languageManager.getCurrentAppLanguageBlocking()
-            // если бы у нас был такой синхронный метод, но с Flow лучше так.
-            // selectedLanguageFlow из DataStore сам вернет дефолтное значение, если ничего нет.
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = AppLanguage.defaultLanguage() // Используем SYSTEM как начальное значение по умолчанию
         )
+
+    // --- НОВОЕ ДЛЯ RECREATE ACTIVITY ---
+    private val _recreateActivityEvent = MutableSharedFlow<Unit>(replay = 0) // replay = 0, чтобы событие не повторялось при переподписке
+    val recreateActivityEvent: SharedFlow<Unit> = _recreateActivityEvent.asSharedFlow()
+    // --- КОНЕЦ НОВОГО ---
 
     init {
         _uiState.update { it.copy(searchQuery = it.cityForDisplay) }
@@ -250,10 +258,11 @@ class DryDriveViewModel @Inject constructor(
     private fun processForecastResponse(response: ForecastResponse): List<DisplayDayWeather> {
         val dailyData = mutableMapOf<String, MutableList<ru.devsoland.drydrive.data.ForecastListItem>>()
 
+        val currentAppLocale = Locale.getDefault()
         val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         inputFormat.timeZone = TimeZone.getTimeZone("UTC")
         val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val dayOfWeekFormat = SimpleDateFormat("E", Locale("ru"))
+        val dayOfWeekFormat = SimpleDateFormat("E", currentAppLocale)
 
         response.list.forEach { item ->
             try {
@@ -324,9 +333,46 @@ class DryDriveViewModel @Inject constructor(
      */
     fun onLanguageSelected(language: AppLanguage) {
         viewModelScope.launch {
-            languageManager.saveSelectedLanguage(language)
-            // Пока что мы НЕ вызываем здесь recreate() или что-то подобное.
-            // Мы просто сохраняем выбор. Применение будет на следующем этапе.
+            val previousLanguage = currentLanguage.value // Запоминаем текущий язык перед сохранением
+            if (previousLanguage == language) {
+                // Если выбран тот же язык, и это не SYSTEM (потому что выбор SYSTEM мог быть для применения системных настроек)
+                // Однако, если у вас previousLanguage уже SYSTEM и вы снова выбираете SYSTEM, то ничего делать не нужно.
+                // Простая проверка: если язык не изменился, выходим.
+                Log.d("ViewModelLanguage", "Language $language already selected or effectively the same. No action.")
+                // Можно добавить более сложную логику, если нужно различать явный выбор SYSTEM от неявного.
+                if (previousLanguage == language) return@launch
+            }
+
+            languageManager.saveSelectedLanguage(language) // LanguageManager должен сохранять language.code
+            Log.d("ViewModelLanguage", "Language with code '${language.code}' saved.")
+
+
+            // Нет необходимости явно обновлять _currentLanguage.value здесь,
+            // так как currentLanguage уже подписывается на selectedLanguageFlow из LanguageManager,
+            // и он обновится автоматически, когда DataStore эмитирует новое значение.
+
+            // Попытка применить локаль на уровне приложения (для Android 13+)
+            // Это необязательно, если recreate() будет вызван, но может помочь системе.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                try {
+                    val localeListToSet: LocaleListCompat
+                    if (language == AppLanguage.SYSTEM || language.code.isEmpty()) { // Проверяем SYSTEM или пустой code
+                        Log.d("ViewModelLanguage", "Setting application locales to system default.")
+                        localeListToSet = LocaleListCompat.getEmptyLocaleList()
+                    } else {
+                        Log.d("ViewModelLanguage", "Attempting to set application locales for code: ${language.code}")
+                        localeListToSet = LocaleListCompat.forLanguageTags(language.code) // Используем code
+                    }
+                    AppCompatDelegate.setApplicationLocales(localeListToSet)
+                    Log.d("ViewModelLanguage", "Application locales call finished for ${language.code.ifEmpty { "SYSTEM" }}")
+                } catch (e: Exception) {
+                    Log.e("ViewModelLanguage", "Error setting application locales: ${e.message}", e)
+                }
+            }
+            // Для версий ниже Android 13, основную работу сделает recreate().
+
+            Log.d("ViewModelLanguage", "Emitting recreateActivityEvent")
+            _recreateActivityEvent.emit(Unit)
         }
     }
 }

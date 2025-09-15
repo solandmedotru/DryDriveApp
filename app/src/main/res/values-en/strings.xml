@@ -31,15 +31,15 @@
     <string name="forecast_unavailable">Forecast unavailable</string>
 
     <!-- Recommendations (пример одной) -->
-    <string name="rec_drink_water_default">Drink water</string>
-    <string name="rec_drink_water_active">Drink water!</string>
-    <string name="rec_drink_water_desc_default">Recommendation: drink water</string>
-    <string name="rec_drink_water_desc_active">Active recommendation: drink water</string>
+    <string name="rec_drink_water_default">Пейте воду!</string>
+    <string name="rec_drink_water_active">Пейте воду!</string>
+    <string name="rec_drink_water_desc_default">Recommendation: Пейте воду!</string>
+    <string name="rec_drink_water_desc_active">Active recommendation: Пейте воду!</string>
 
-    <string name="rec_uv_protection_default">Высокий УФ</string>
-    <string name="rec_uv_protection_active">Защита от УФ!</string>
-    <string name="rec_uv_protection_desc_default">Рекомендация: УФ защита</string>
-    <string name="rec_uv_protection_desc_active">Активная рекомендация: УФ защита</string>
+    <string name="rec_uv_protection_default">Высокий UF</string>
+    <string name="rec_uv_protection_active">Защита от UF!</string>
+    <string name="rec_uv_protection_desc_default">Рекомендация: UF защита</string>
+    <string name="rec_uv_protection_desc_active">Активная рекомендация: UF защита</string>
 
     <string name="rec_tire_change_default">Смена колес</string>
     <string name="rec_tire_change_active">Заморозки!</string>
@@ -60,4 +60,5 @@
     <string name="language_english">English</string>
     <string name="settings_language_title">Application Language</string>
     <string name="map_screen_placeholder">Map (under development)</string>
+    <string name="language_system">English</string>
 </resources>
