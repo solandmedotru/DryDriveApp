@@ -11,6 +11,7 @@
     <string name="action_search">Поиск</string>
     <string name="action_menu">Меню</string>
     <string name="drawer_menu_todo">Меню (TODO)</string>
+    <string name="city_not_found_short">Не найдено</string>
 
     <!-- Сообщения об ошибках и состояниях из ViewModel -->
     <string name="error_loading_cities">Не удалось загрузить список городов.</string>
@@ -99,6 +100,7 @@
     <string name="nav_home">Главная</string>
     <string name="nav_map">Карта</string>
     <string name="nav_settings">Настройки</string>
+    <string name="open_navigation_drawer">Открыть меню навигации</string>
 
     <!-- Settings -->
     <string name="language_russian">Русский</string>
@@ -106,4 +108,7 @@
     <string name="settings_language_title">Язык приложения</string>
     <string name="map_screen_placeholder">Карта (в разработке)</string>
     <string name="language_system">Системный</string>
+
+
+
 </resources>

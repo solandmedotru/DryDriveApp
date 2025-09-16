@@ -77,13 +77,7 @@ fun DryDriveApp( viewModel: WeatherViewModel) {
                 topBar = {
                     DryDriveTopAppBar(
                         uiState = uiState,
-                        onQueryChange = { query ->
-                            viewModel.onEvent(WeatherEvent.SearchQueryChanged(query))
-                        },
-                        onCitySelected = { city, formattedName ->
-                            viewModel.onEvent(WeatherEvent.CitySelectedFromSearch(city,formattedName))
-                        },
-                        onDismissSearch = { viewModel.onEvent(WeatherEvent.DismissCitySearchDropDown) },
+                        onEvent = viewModel::onEvent, // Передаем ссылку на onEvent из ViewModel
                         onMenuClick = { scope.launch { drawerState.open() } }
                     )
                 },

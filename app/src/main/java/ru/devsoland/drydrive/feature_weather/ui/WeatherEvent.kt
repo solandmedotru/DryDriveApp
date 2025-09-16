@@ -16,5 +16,8 @@ sealed class WeatherEvent {
     data class RecommendationClicked(val recommendation: Recommendation) : WeatherEvent() // Добавлено
     object DismissRecommendationDialog : WeatherEvent() // Добавлено
 
+    object ShowSearchField : WeatherEvent() // При клике на иконку лупы
+    object HideSearchFieldAndDismissDropdown : WeatherEvent() // При клике на "ОК" или при выборе города
+
     // Можно добавить и другие события по мере необходимости
 }

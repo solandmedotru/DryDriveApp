@@ -8,7 +8,6 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -110,8 +109,6 @@ class WeatherViewModel @Inject constructor(
                 if (_uiState.value.currentLanguageCode != appLang.code) {
                     Log.d(TAG, "currentLanguage.onEach: Код языка в UiState обновлен на: ${appLang.code}")
                     _uiState.update { it.copy(currentLanguageCode = appLang.code) }
-                    // Рекомендации будут обновлены, когда fetchCurrentWeatherAndForecast
-                    // вызовет generateRecommendations после смены языка и загрузки данных.
                 }
             }
             .launchIn(viewModelScope)
@@ -162,8 +159,55 @@ class WeatherViewModel @Inject constructor(
     fun onEvent(event: WeatherEvent) {
         when (event) {
             is WeatherEvent.SearchQueryChanged -> handleSearchQueryChanged(event.query)
-            is WeatherEvent.CitySelectedFromSearch -> handleCitySelected(event.city, event.formattedName)
-            WeatherEvent.DismissCitySearchDropDown -> _uiState.update { it.copy(isSearchDropDownExpanded = false) }
+            is WeatherEvent.CitySelectedFromSearch -> handleCitySelected(event.city, event.formattedName) // handleCitySelected уже управляет searchQuery и isSearchDropDownExpanded
+
+            WeatherEvent.ShowSearchField -> {
+                _uiState.update {
+                    it.copy(
+                        isSearchFieldVisible = true,
+                        // Можно сразу установить фокус на поле ввода, если мы хотим,
+                        // но это лучше делать в UI с FocusRequester при изменении isSearchFieldVisible
+                    )
+                }
+            }
+
+            WeatherEvent.HideSearchFieldAndDismissDropdown -> {
+                _uiState.update {
+                    it.copy(
+                        isSearchFieldVisible = false,
+                        isSearchDropDownExpanded = false,
+                        citySearchErrorMessage = null, // Очищаем ошибку при закрытии поля
+                        // searchQuery можно не трогать, если хотим сохранить последнее введенное
+                        // или очистить: searchQuery = "" (но это уже делает CitySelectedFromSearch)
+                    )
+                }
+            }
+
+            WeatherEvent.DismissCitySearchDropDown -> {
+                _uiState.update {
+                    it.copy(
+                        isSearchDropDownExpanded = false,
+                        // Опционально: сбросить ошибку поиска, если она не должна "залипать"
+                        // citySearchErrorMessage = null
+                    )
+                }
+            }
+            is WeatherEvent.SearchQueryChanged -> handleSearchQueryChanged(event.query)
+            is WeatherEvent.CitySelectedFromSearch -> {
+                // handleCitySelected уже устанавливает isSearchDropDownExpanded = false
+                // и обновляет searchQuery. Дополнительно скроем поле.
+                handleCitySelected(event.city, event.formattedName)
+                _uiState.update { it.copy(isSearchFieldVisible = false, citySearchErrorMessage = null) }
+            }
+            WeatherEvent.DismissCitySearchDropDown -> { // Вызывается, когда пользователь кликает вне DropdownMenu
+                _uiState.update {
+                    it.copy(
+                        isSearchDropDownExpanded = false
+                        // Не скрываем isSearchFieldVisible здесь, пользователь может еще хотеть печатать
+                    )
+                }
+            }
+
             WeatherEvent.RefreshWeatherClicked -> {
                 _uiState.value.selectedCityObject?.let {
                     fetchCurrentWeatherAndForecast(it)
@@ -175,13 +219,11 @@ class WeatherViewModel @Inject constructor(
             WeatherEvent.ClearWeatherErrorMessage -> _uiState.update {
                 it.copy(weatherErrorMessage = null, forecastErrorMessage = null)
             }
-
             is WeatherEvent.RecommendationClicked -> {
                 Log.d(TAG, "RecommendationClicked: ${event.recommendation.id}")
                 _uiState.update {
                     it.copy(
                         showRecommendationDialog = true,
-                        // Используем textResId и descriptionResId, как мы определили в Recommendation data class
                         recommendationDialogTitleResId = event.recommendation.textResId,
                         recommendationDialogDescriptionResId = event.recommendation.descriptionResId
                     )
@@ -192,7 +234,7 @@ class WeatherViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         showRecommendationDialog = false,
-                        recommendationDialogTitleResId = null, // Сбрасываем ID, чтобы избежать случайного показа старых данных
+                        recommendationDialogTitleResId = null,
                         recommendationDialogDescriptionResId = null
                     )
                 }
@@ -200,44 +242,97 @@ class WeatherViewModel @Inject constructor(
         }
     }
 
+    // ИСПРАВЛЕННАЯ ВЕРСИЯ handleSearchQueryChanged
     private fun handleSearchQueryChanged(query: String) {
+        val minQueryLength = 3
+        val debounceDelayMs = 1000L
+
         _uiState.update {
             it.copy(
                 searchQuery = query,
-                isSearchDropDownExpanded = query.isNotEmpty(),
-                citySearchErrorMessage = null
-            )
+                citySearchErrorMessage = null,
+                citySearchResults = if (query.length < minQueryLength) emptyList() else it.citySearchResults,
+                // Сразу сбрасываем isSearchDropDownExpanded, он установится в true только если есть результаты
+                isSearchDropDownExpanded = if (query.length < minQueryLength) false else it.isSearchDropDownExpanded            )
         }
+
         citySearchJob?.cancel()
-        if (query.length > 2) {
+
+        if (query.length >= minQueryLength) {
+            // Устанавливаем isLoadingCities = true, но НЕ трогаем isSearchDropDownExpanded здесь
             _uiState.update { it.copy(isLoadingCities = true) }
+
             citySearchJob = viewModelScope.launch {
+                delay(debounceDelayMs)
+
+                if (query != _uiState.value.searchQuery) {
+                    // Если isLoadingCities было установлено для старого запроса,
+                    // а новый запрос короткий, isLoadingCities нужно сбросить.
+                    // Но если новый запрос тоже длинный, то он установит свой isLoadingCities.
+                    // Этот блок может быть не нужен, если следующий if/else корректно обработает isLoadingCities
+                    _uiState.update { it.copy(isLoadingCities = if(it.searchQuery.length >= minQueryLength) it.isLoadingCities else false) }
+                    Log.d(TAG, "Поиск для '$query' отменен из-за изменения запроса на '${_uiState.value.searchQuery}' во время debounce.")
+                    return@launch
+                }
+
                 val apiLang = getApiLangCode()
-                delay(500)
+                Log.d(TAG, "Начинаем поиск для '$query' после задержки $debounceDelayMs мс")
                 try {
                     val results = withContext(Dispatchers.IO) {
                         weatherApi.searchCities(query = query, apiKey = apiKey, lang = apiLang)
                     }
-                    _uiState.update {
-                        it.copy(
-                            citySearchResults = results,
-                            isLoadingCities = false,
-                            citySearchErrorMessage = if (results.isEmpty()) application.applicationContext.getString(R.string.city_not_found) else null,
-                            isSearchDropDownExpanded = results.isNotEmpty() || (results.isEmpty() && query.isNotEmpty())
-                        )
+
+                    if (query == _uiState.value.searchQuery) {
+                        if (results.isNotEmpty()) {
+                            _uiState.update {
+                                it.copy(
+                                    citySearchResults = results,
+                                    isLoadingCities = false,
+                                    citySearchErrorMessage = null,
+                                    isSearchDropDownExpanded = true // <--- ОТКРЫВАЕМ ТОЛЬКО ЗДЕСЬ
+                                )
+                            }
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    citySearchResults = emptyList(),
+                                    isLoadingCities = false,
+                                    citySearchErrorMessage = R.string.city_not_found,
+                                    isSearchDropDownExpanded = false // Остается закрытым
+                                )
+                            }
+                        }
+                    } else {
+                        // Если запрос изменился, а этот job все еще работал, сбрасываем isLoadingCities для ЭТОГО (старого) запроса.
+                        // Новый запрос установит свой isLoadingCities.
+                        _uiState.update { currentUiState ->
+                            if(currentUiState.searchQuery != query) currentUiState.copy(isLoadingCities = false) else currentUiState
+                        }
+                        Log.d(TAG, "Результаты поиска для '$query' проигнорированы (запрос изменился)")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Ошибка поиска городов для '$query': ${e.message}", e)
-                    _uiState.update {
-                        it.copy(
-                            isLoadingCities = false,
-                            citySearchErrorMessage = application.applicationContext.getString(R.string.error_loading_cities)
-                        )
+                    if (query == _uiState.value.searchQuery) {
+                        _uiState.update {
+                            it.copy(
+                                isLoadingCities = false,
+                                citySearchResults = emptyList(),
+                                citySearchErrorMessage = R.string.error_loading_cities,
+                                isSearchDropDownExpanded = false // Остается закрытым
+                            )
+                        }
                     }
                 }
             }
-        } else {
-            _uiState.update { it.copy(citySearchResults = emptyList(), isLoadingCities = false) }
+        } else { // Запрос слишком короткий
+            _uiState.update {
+                it.copy(
+                    citySearchResults = emptyList(),
+                    isLoadingCities = false, // Важно сбросить, если текст стерли до < minQueryLength
+                    citySearchErrorMessage = null,
+                    isSearchDropDownExpanded = false
+                )
+            }
         }
     }
 
@@ -250,10 +345,12 @@ class WeatherViewModel @Inject constructor(
                 searchQuery = formattedName,
                 citySearchResults = emptyList(),
                 isSearchDropDownExpanded = false,
+                isSearchFieldVisible = false, // <-- ВАЖНО: скрываем поле поиска
                 weatherErrorMessage = null,
                 forecastErrorMessage = null,
                 dailyForecasts = emptyList(),
-                isInitialLoading = false
+                isInitialLoading = false,
+                citySearchErrorMessage = null
             )
         }
         fetchCurrentWeatherAndForecast(city)
@@ -309,7 +406,7 @@ class WeatherViewModel @Inject constructor(
                 }
             } else {
                 Log.w(TAG, "Пропуск прогноза: Неверные Lat/Lon для ${city.name}.")
-                forecastFetchError = application.applicationContext.getString(R.string.error_loading_weather) // Или более специфичная строка
+                forecastFetchError = application.applicationContext.getString(R.string.error_loading_weather)
             }
 
             val currentRecommendations = generateRecommendations(fetchedWeather, processedForecasts)
@@ -383,6 +480,7 @@ class WeatherViewModel @Inject constructor(
     }
 
     private fun mapWeatherConditionToIcon(condition: String?, iconCode: String?): Int {
+        // ... (ваш существующий код)
         return when (iconCode) {
             "01d" -> R.drawable.ic_sun_filled
             "01n" -> R.drawable.ic_moon_filled
@@ -396,20 +494,12 @@ class WeatherViewModel @Inject constructor(
             "11d", "11n" -> R.drawable.ic_thunderstorm_filled
             "13d", "13n" -> R.drawable.ic_snow_filled
             "50d", "50n" -> R.drawable.ic_fog_filled
-            else -> R.drawable.ic_sun_cloud_filled
+            else -> R.drawable.ic_sun_cloud_filled // Иконка по умолчанию
         }
     }
 
     private fun generateRecommendations(weatherData: Weather?, forecastData: List<DisplayDayWeather>?): List<Recommendation> {
-        // Логгирование локали здесь теперь менее важно, так как строки будут извлекаться в UI
-        // val appCtx = application.applicationContext
-        // val currentLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        //     appCtx.resources.configuration.locales[0]
-        // } else {
-        //     appCtx.resources.configuration.locale
-        // }
-        // Log.d(TAG, "generateRecommendations: Current locale check (ViewModel): $currentLocale")
-
+        // ... (ваш существующий код)
         val recommendations = mutableListOf<Recommendation>()
         if (weatherData == null) {
             return emptyList()
@@ -453,7 +543,7 @@ class WeatherViewModel @Inject constructor(
                 id = "check_tires",
                 textResId = if (isColdForTires) R.string.rec_tire_change_active else R.string.rec_tire_change_default,
                 descriptionResId = if (isColdForTires) R.string.rec_tire_change_desc_active else R.string.rec_tire_change_desc_default,
-                icon = Icons.Filled.DirectionsCar,
+                icon = Icons.Filled.DirectionsCar, // Или Icons.Filled.Build
                 isActive = isColdForTires,
                 activeColor = Color(0xFF81D4FA)
             )
@@ -477,8 +567,6 @@ class WeatherViewModel @Inject constructor(
                 activeColor = Color(0xFFFFB74D)
             )
         )
-
-        // --- НОВЫЕ РЕКОМЕНДАЦИИ (продолжите для всех) ---
         // 5. Dress warmly
         val needsWarmClothes = currentTemp < 10.0
         recommendations.add(
@@ -507,12 +595,8 @@ class WeatherViewModel @Inject constructor(
                 activeColor = Color(0xFFEF5350)
             )
         )
-        // Добавьте остальные новые рекомендации (check_tires уже был, careful_roads, ventilate, moisturizer, light_clothes) по аналогии...
-        // Не забудьте для каждой добавить Log.d, чтобы видеть, какие строки извлекаются
-
         return recommendations
     }
-
 
     fun onLanguageSelected(language: AppLanguage) {
         viewModelScope.launch {
@@ -543,7 +627,6 @@ class WeatherViewModel @Inject constructor(
                     it.copy(
                         cityForDisplay = newFormattedName,
                         searchQuery = if (it.searchQuery == oldFormattedName) newFormattedName else it.searchQuery
-                        // currentLanguageCode обновится через коллектор в init{}
                     )
                 }
                 fetchCurrentWeatherAndForecast(cityToUpdate, apiLangForUpdate)
@@ -551,10 +634,7 @@ class WeatherViewModel @Inject constructor(
                 Log.d(TAG, "onLanguageSelected: Язык изменен, город не выбран (или по умолчанию), обновление данных для города по умолчанию.")
                 findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true, apiLangForUpdate)
             } else {
-                Log.d(TAG, "onLanguageSelected: Язык изменен, но город не выбран и не является городом по умолчанию. UI должен обновиться без перезагрузки погоды (только через currentLanguage.onEach).")
-                // В этом случае, если recommendations не были перегенерированы в currentLanguage.onEach (из-за отсутствия weather data),
-                // они могут остаться на старом языке. Однако, если weather data нет, то и рекомендаций быть не должно.
-                // Если же они есть, то currentLanguage.onEach должен был их обновить.
+                Log.d(TAG, "onLanguageSelected: Язык изменен, но город не выбран и не является городом по умолчанию.")
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -599,7 +679,7 @@ class WeatherViewModel @Inject constructor(
                             searchQuery = formattedName
                         )
                     }
-                    fetchCurrentWeatherAndForecast(foundCity, explicitApiLang) // Это вызовет generateRecommendations в конце
+                    fetchCurrentWeatherAndForecast(foundCity, explicitApiLang)
                     if (isInitialOrFallback) {
                         userPreferencesManager.saveLastSelectedCity(foundCity)
                     }

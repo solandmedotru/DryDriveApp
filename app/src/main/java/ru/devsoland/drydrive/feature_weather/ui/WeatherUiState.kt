@@ -12,8 +12,9 @@ data class WeatherUiState(
     val searchQuery: String = "",
     val citySearchResults: List<City> = emptyList(),
     val isLoadingCities: Boolean = false,
-    val citySearchErrorMessage: String? = null,
+    @StringRes val citySearchErrorMessage: Int? = null,
     val isSearchDropDownExpanded: Boolean = false,
+    val isSearchFieldVisible: Boolean = false, // НОВОЕ ПОЛЕ: для управления видимостью поля поиска в TopAppBar
     val cityForDisplay: String = "",
     val selectedCityObject: City? = null,
     val dailyForecasts: List<DisplayDayWeather> = emptyList(),
@@ -24,5 +25,5 @@ data class WeatherUiState(
     val recommendations: List<Recommendation> = emptyList(),
     val showRecommendationDialog: Boolean = false,
     @StringRes val recommendationDialogTitleResId: Int? = null,
-    @StringRes val recommendationDialogDescriptionResId: Int? = null
+    @StringRes val recommendationDialogDescriptionResId: Int? = null,
 )
