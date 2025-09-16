@@ -1,6 +1,5 @@
 package ru.devsoland.drydrive.feature_weather.ui.composables
 
-import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Icon
@@ -22,12 +21,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.WbSunny // Пример для Preview
 import androidx.compose.ui.graphics.Color // Пример для Preview
 import ru.devsoland.drydrive.R
-import ru.devsoland.drydrive.feature_weather.ui.Recommendation
 import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent
+// Логирование было убрано, импорты, связанные с ним, тоже могут быть не нужны, если не используются где-то еще.
+// import android.util.Log
+// import androidx.compose.ui.platform.LocalContext
+// import androidx.appcompat.app.AppCompatDelegate
+// import androidx.core.os.ConfigurationCompat
+// import java.util.Locale
 
 @Composable
 fun RecommendationsDisplaySection(
-    recommendations: List<Recommendation>,
+    recommendations: List<WeatherEvent.Recommendation>,
     onEvent: (WeatherEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -51,7 +55,7 @@ fun RecommendationsDisplaySection(
 
 @Composable
 fun DynamicRecommendationChip(
-    recommendation: Recommendation,
+    recommendation: WeatherEvent.Recommendation,
     onEvent: (WeatherEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -67,7 +71,6 @@ fun DynamicRecommendationChip(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    // Получаем строки для contentDescription заранее
     val recommendationShortText = stringResource(id = recommendation.textResId)
     val recommendationFullDescription = stringResource(id = recommendation.descriptionResId)
 
@@ -81,25 +84,24 @@ fun DynamicRecommendationChip(
                 onClickLabel = stringResource(id = R.string.select_city_action),
                 role = Role.Button,
                 onClick = {
-                    Log.d("DynamicChip", "Clicked: ${recommendation.id}, TextResId: ${recommendation.textResId}")
+                    // Log.d("DynamicChipClick", "Clicked: ${recommendation.id}, TextResId: ${recommendation.textResId}") // Лог удален
                     onEvent(WeatherEvent.RecommendationClicked(recommendation))
                 }
             )
             .padding(dimensionResource(id = R.dimen.spacing_small))
             .semantics {
-                contentDescription = "$recommendationShortText. $recommendationFullDescription" // <--- ИСПРАВЛЕНО ЗДЕСЬ
+                contentDescription = "$recommendationShortText. $recommendationFullDescription"
             }
     ) {
         Icon(
             imageVector = recommendation.icon,
-            contentDescription = null, // Описание уже на родительском Column
+            contentDescription = null, 
             tint = currentIconColor,
             modifier = Modifier.size(dimensionResource(id = R.dimen.icon_size_large))
         )
         Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.spacing_extra_small)))
         Text(
-            // Используем ту же переменную, что и для semantics, чтобы избежать двойного вызова stringResource
-            text = recommendationShortText,
+            text = recommendationShortText, 
             color = currentTextColor,
             style = MaterialTheme.typography.labelSmall,
             textAlign = TextAlign.Center,
@@ -115,7 +117,7 @@ fun DynamicRecommendationChip(
 fun DynamicRecommendationChipActivePreview() {
     MaterialTheme {
         DynamicRecommendationChip(
-            recommendation = Recommendation(
+            recommendation = WeatherEvent.Recommendation(
                 id = "preview_active_chip",
                 textResId = R.string.rec_drink_water_active,
                 descriptionResId = R.string.rec_drink_water_desc_active,
@@ -133,7 +135,7 @@ fun DynamicRecommendationChipActivePreview() {
 fun DynamicRecommendationChipInactivePreview() {
     MaterialTheme {
         DynamicRecommendationChip(
-            recommendation = Recommendation(
+            recommendation = WeatherEvent.Recommendation(
                 id = "preview_inactive_chip",
                 textResId = R.string.rec_umbrella_default,
                 descriptionResId = R.string.rec_umbrella_desc_default,
@@ -145,4 +147,3 @@ fun DynamicRecommendationChipInactivePreview() {
         )
     }
 }
-

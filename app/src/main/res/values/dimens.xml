@@ -8,6 +8,7 @@
     <dimen name="font_size_small_caption">12sp</dimen>
 
     <!-- Icon Sizes -->
+    <dimen name="icon_size_small">18dp</dimen>
     <dimen name="icon_size_standard">24dp</dimen>
     <dimen name="icon_size_medium">20dp</dimen>
     <dimen name="icon_size_large">36dp</dimen>
@@ -39,4 +40,9 @@
 
     <dimen name="top_app_bar_height">56dp</dimen>
     <dimen name="daily_forecast_row_height">120dp</dimen>
+    <dimen name="padding_small">8dp</dimen>
+    <dimen name="padding_medium">16dp</dimen>
+    <dimen name="corner_radius_large">16dp</dimen>
+    <dimen name="forecast_card_width_expanded">100dp</dimen>
+    <dimen name="icon_size_medium_large">30dp</dimen>
 </resources>

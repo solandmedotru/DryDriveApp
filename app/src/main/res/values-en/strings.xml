@@ -32,8 +32,6 @@
     <string name="car_clean_description">Clean car</string>
     <string name="city_background_description">City background</string>
 
-    <!-- Weather Details -->
-    <string name="weather_data_unavailable">No data</string>
 
     <!-- Forecast -->
     <string name="forecast_now">Now</string>
@@ -112,4 +110,48 @@
 
     <string name="settings_theme_title">Theme</string>
     <string name="settings_theme_dark_mode_toggle">Dark Theme</string>
+
+
+    <!-- Units and formats (some might already exist or need correction) -->
+    <string name="unit_temperature_celsius">°C</string>
+    <string name="format_pressure_hpa">%1$s hPa</string>
+    <string name="format_wind_speed_mps">%1$d m/s</string>
+    <string name="format_visibility_km">%1$s km</string>
+    <string name="weather_data_unavailable">Data unavailable</string>
+
+    <!-- Wind directions (some might already exist or need correction) -->
+    <string name="wind_dir_n">N</string>
+    <string name="wind_dir_ne">NE</string>
+    <string name="wind_dir_e">E</string>
+    <string name="wind_dir_se">SE</string>
+    <string name="wind_dir_s">S</string>
+    <string name="wind_dir_sw">SW</string>
+    <string name="wind_dir_w">W</string>
+    <string name="wind_dir_nw">NW</string>
+
+    <!-- For expandable forecast cards -->
+    <string name="action_collapse">Collapse</string>
+    <string name="action_expand">Expand</string>
+    <string name="details_feels_like">Feels like:</string>
+    <string name="details_humidity">Humidity:</string>
+    <string name="details_pressure_hpa_label">Pressure:</string> <!-- Label for pressure -->
+    <string name="pressure_units_hpa">hPa</string> <!-- Unit for separate display if needed -->
+    <string name="details_wind_speed_mps_label">Wind:</string> <!-- Label for wind -->
+    <string name="wind_speed_units_mps">m/s</string> <!-- Unit for separate display if needed -->
+    <string name="details_visibility_km_label">Visibility:</string> <!-- Label for visibility -->
+    <string name="visibility_units_km">km</string> <!-- Unit for separate display if needed -->
+    <string name="details_clouds">Clouds:</string>
+    <string name="details_precipitation_probability">Precipitation probability:</string>
+
+    <string name="city_search_too_short">Enter at least 2 characters</string>
+    <string name="city_search_no_results">City not found</string>
+    <string name="city_search_error">City search error</string>
+    <string name="hide_search_description">Скрыть поиск</string>
+    <string name="city_search_no_results_in_dropdown">Нет результатов</string>
+    <string name="bottom_nav_weather">Погода</string>
+    <string name="details_weather_description">Подробная погода</string>
+    <string name="error_api_key_invalid">API key is invalid or unauthorized. Please check your key.</string>
+
+
+
 </resources>

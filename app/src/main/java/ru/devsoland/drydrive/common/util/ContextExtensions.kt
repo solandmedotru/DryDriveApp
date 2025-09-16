@@ -10,7 +10,7 @@ import java.util.Locale
 
 fun Context.setAppLocale(languageCode: String): Context {
     Log.d("AppLocaleConfig", "Context.setAppLocale called with languageCode: '$languageCode'")
-    val localeToSet: Locale = if (languageCode.isEmpty()) {
+    val localeToSet: Locale = if (languageCode.isEmpty() || languageCode.equals("system", ignoreCase = true)) {
         val systemLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             resources.configuration.locales[0]
         } else {
@@ -32,7 +32,7 @@ fun Context.setAppLocale(languageCode: String): Context {
         config.locale = localeToSet
     }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val localeListCompat = if (languageCode.isEmpty()) {
+        val localeListCompat = if (languageCode.isEmpty() || languageCode.equals("system", ignoreCase = true)) {
             LocaleListCompat.getEmptyLocaleList()
         } else {
             LocaleListCompat.forLanguageTags(languageCode)

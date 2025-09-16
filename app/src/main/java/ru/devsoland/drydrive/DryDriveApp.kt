@@ -26,31 +26,70 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-// import androidx.lifecycle.viewmodel.compose.viewModel // viewModel будет инжектироваться в DryDriveApp
 import kotlinx.coroutines.launch
+import ru.devsoland.drydrive.common.model.AppLanguage // *** ДОБАВЛЕН ИМПОРТ ***
+import ru.devsoland.drydrive.common.ui.navigation.BottomNavItem
 import ru.devsoland.drydrive.common.ui.navigation.DryDriveBottomNavigationBar
 import ru.devsoland.drydrive.common.ui.navigation.DryDriveTopAppBar
 import ru.devsoland.drydrive.feature_map.ui.MapScreenPlaceholder
 import ru.devsoland.drydrive.feature_settings.ui.SettingsScreen
-// ЗАМЕНЯЕМ WeatherScreenContent на WeatherScreen
+import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent
 import ru.devsoland.drydrive.feature_weather.ui.WeatherScreen
 import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
-import androidx.hilt.navigation.compose.hiltViewModel // Для получения ViewModel в Composable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DryDriveApp(
     weatherViewModel: WeatherViewModel
 ) {
-
-    val uiState by weatherViewModel.uiState.collectAsState() // Собираем uiState здесь
-
+    val uiState by weatherViewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    var selectedItemIndex by rememberSaveable { mutableStateOf(0) }
 
-    Log.d("DryDriveApp", "Recomposing DryDriveApp with lang code from uiState: ${uiState.currentLanguageCode}")
+    var selectedItemIndex by rememberSaveable { mutableStateOf(0) } // 0: WeatherMain, 1: Map, 2: Settings
+    var isSearchFieldVisible by rememberSaveable { mutableStateOf(false) }
+    var isSearchDropDownExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Log.d("DryDriveApp", "Recomposing DryDriveApp. Lang: ${uiState.currentLanguageCode}, SearchVisible: $isSearchFieldVisible, DropdownExpanded: $isSearchDropDownExpanded, SelectedIndex: $selectedItemIndex, ErrorMsg: ${uiState.citySearchErrorMessage}")
+
+    val screenRoutes = listOf(
+        BottomNavItem.WeatherMain.route,
+        BottomNavItem.Map.route,
+        BottomNavItem.Settings.route
+    )
+
+    fun onTopBarEvent(event: WeatherEvent) {
+        Log.d("DryDriveApp", "onTopBarEvent: $event")
+        weatherViewModel.onEvent(event)
+
+        when (event) {
+            is WeatherEvent.ShowSearchField -> {
+                isSearchFieldVisible = true
+                isSearchDropDownExpanded = uiState.citySearchQuery.isNotEmpty() && uiState.citySearchErrorMessage == null
+            }
+            is WeatherEvent.HideSearchFieldAndDismissDropdown -> {
+                isSearchFieldVisible = false
+                isSearchDropDownExpanded = false
+            }
+            is WeatherEvent.CitySelectedFromSearch -> {
+                isSearchFieldVisible = false
+                isSearchDropDownExpanded = false
+            }
+            is WeatherEvent.DismissCitySearchDropDown -> {
+                isSearchDropDownExpanded = false
+            }
+            is WeatherEvent.SearchQueryChanged -> {
+                isSearchDropDownExpanded = event.query.isNotEmpty() && isSearchFieldVisible && uiState.citySearchErrorMessage == null
+            }
+            else -> Unit
+        }
+    }
+
+    // *** Лямбда для SettingsScreen ***
+    val handleLanguageConfirmed: (AppLanguage) -> Unit = {
+        selectedLanguage -> weatherViewModel.onEvent(WeatherEvent.ChangeLanguage(selectedLanguage))
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -81,31 +120,39 @@ fun DryDriveApp(
                 containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
                     DryDriveTopAppBar(
-                        uiState = uiState, // Используем uiState из общей ViewModel
-                        onEvent = weatherViewModel::onEvent,
+                        uiState = uiState,
+                        isSearchFieldVisible = isSearchFieldVisible,
+                        isSearchDropDownExpanded = isSearchDropDownExpanded,
+                        onEvent = ::onTopBarEvent,
                         onMenuClick = { scope.launch { drawerState.open() } }
                     )
                 },
                 bottomBar = {
                     DryDriveBottomNavigationBar(
-                        selectedIndex = selectedItemIndex,
-                        onItemSelected = { index -> selectedItemIndex = index }
+                        currentRoute = screenRoutes.getOrNull(selectedItemIndex),
+                        onNavigate = { route ->
+                            val newIndex = screenRoutes.indexOf(route)
+                            if (newIndex != -1) {
+                                selectedItemIndex = newIndex
+                                if (isSearchFieldVisible) {
+                                    onTopBarEvent(WeatherEvent.HideSearchFieldAndDismissDropdown)
+                                }
+                            }
+                        }
                     )
                 }
-            ) { paddingValues -> // paddingValues от ЭТОГО Scaffold
-                Log.d("DryDriveApp_Scaffold", "PaddingValues: Top=${paddingValues.calculateTopPadding()}, Bottom=${paddingValues.calculateBottomPadding()}")
+            ) { paddingValues ->
                 when (selectedItemIndex) {
-                    0 -> // Экран Погоды
-                        WeatherScreen(
-                            modifier = Modifier.padding(paddingValues).fillMaxSize(),
-                            viewModel = weatherViewModel
-                        )
+                    0 -> WeatherScreen(
+                        modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                        viewModel = weatherViewModel
+                    )
                     1 -> MapScreenPlaceholder(
                         modifier = Modifier.padding(paddingValues).fillMaxSize()
                     )
-                    2 -> SettingsScreen( // <--- ИЗМЕНЕНИЕ ЗДЕСЬ
-                        modifier = Modifier.padding(paddingValues).fillMaxSize()
-                        // viewModel = weatherViewModel <-- ЭТА СТРОКА УДАЛЕНА
+                    2 -> SettingsScreen(
+                        modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                        onLanguageConfirmed = handleLanguageConfirmed // *** ПЕРЕДАЕМ ЛЯМБДУ ***
                     )
                 }
             }
@@ -119,12 +166,7 @@ fun DryDriveApp(
 fun DryDriveAppPreview() {
     DryDriveTheme {
         Surface(color = MaterialTheme.colorScheme.background) {
-            // Для превью потребуется создать мок/фейк WeatherViewModel,
-            // так как hiltViewModel() не будет работать здесь без доп. настройки для превью.
-            // Например:
-            // val fakeViewModel = object : WeatherViewModel(...) { /* ... */ }
-            // DryDriveApp(viewModel = fakeViewModel)
-            Text("Preview of DryDriveApp requires a WeatherViewModel instance.")
+            Text("Preview of DryDriveApp requires a WeatherViewModel instance and Hilt setup for preview.")
         }
     }
 }

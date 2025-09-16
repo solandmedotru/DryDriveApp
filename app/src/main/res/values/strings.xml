@@ -6,7 +6,8 @@
     <string name="clear_search_description">Очистить</string>
     <string name="location_description">Местоположение</string>
     <string name="select_city_prompt">Выберите город</string>
-    <string name="select_city_action">Выбрать город</string><string name="city_not_found">Город не найден. Проверьте название.</string>
+    <string name="select_city_action">Выбрать город</string>
+    <string name="city_not_found">Город не найден. Проверьте название.</string>
     <string name="action_ok">ОК</string>
     <string name="action_search">Поиск</string>
     <string name="action_menu">Меню</string>
@@ -112,6 +113,40 @@
 
     <string name="settings_theme_title">Тема оформления</string>
     <string name="settings_theme_dark_mode_toggle">Темная тема</string>
+    <string name="unit_temperature_celsius">°</string> <!-- Или °C, как вам больше нравится -->
+    <string name="format_pressure_hpa">%1$s гПа</string> <!-- %1$s будет заменено на значение давления -->
+    <string name="format_wind_speed_mps">%1$d м/с</string> <!-- %1$d для целого числа скорости ветра -->
+    <string name="format_visibility_km">%1$s км</string>
+    <string name="wind_dir_n">С</string>
+    <string name="wind_dir_ne">СВ</string>
+    <string name="wind_dir_e">В</string>
+    <string name="wind_dir_se">ЮВ</string>
+    <string name="wind_dir_s">Ю</string>
+    <string name="wind_dir_sw">ЮЗ</string>
+    <string name="wind_dir_w">З</string>
+    <string name="wind_dir_nw">СЗ</string>
 
+    <!-- Для раскрывающихся карточек прогноза -->
+    <string name="action_collapse">Свернуть</string>
+    <string name="action_expand">Развернуть</string>
+    <string name="details_feels_like">Ощущается как:</string>
+    <string name="details_humidity">Влажность:</string>
+    <string name="details_pressure_hpa_label">Давление:</string> <!-- Метка для давления -->
+    <string name="pressure_units_hpa">гПа</string> <!-- Единица для отображения отдельно, если нужно -->
+    <string name="details_wind_speed_mps_label">Ветер:</string> <!-- Метка для ветра -->
+    <string name="wind_speed_units_mps">м/с</string> <!-- Единица для отображения отдельно, если нужно -->
+    <string name="details_visibility_km_label">Видимость:</string> <!-- Метка для видимости -->
+    <string name="visibility_units_km">км</string> <!-- Единица для отображения отдельно, если нужно -->
+    <string name="details_clouds">Облачность:</string>
+    <string name="details_precipitation_probability">Вероятность осадков:</string>
+
+    <string name="city_search_too_short">Введите минимум 2 символа</string>
+    <string name="city_search_no_results">Город не найден</string>
+    <string name="city_search_error">Ошибка поиска города</string>
+    <string name="hide_search_description">Скрыть поиск</string>
+    <string name="city_search_no_results_in_dropdown">Нет результатов</string>
+    <string name="bottom_nav_weather">Погода</string>
+    <string name="details_weather_description">Подробная погода</string>
+    <string name="error_api_key_invalid">API key is invalid or unauthorized. Please check your key.</string>
 
 </resources>

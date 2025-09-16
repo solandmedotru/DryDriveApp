@@ -23,7 +23,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-// import androidx.compose.ui.semantics.error // Похоже, этот импорт не используется
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,50 +35,25 @@ import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationInfoDi
 import ru.devsoland.drydrive.ui.theme.CityBackgroundOverlay
 import java.util.Locale
 
-// НОВЫЕ ИМПОРТЫ:
 import android.util.Log
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
-import ru.devsoland.drydrive.common.ui.navigation.DryDriveBottomNavigationBar
-import ru.devsoland.drydrive.common.ui.navigation.DryDriveTopAppBar
-
-// Точка входа для экрана Погоды
-
-// Эта функция теперь становится более простой "оберткой", если она вообще нужна отдельно.
-// Или можно ее логику (сбор uiState и отображение диалога) перенести прямо в DryDriveApp.kt
-// для случая selectedItemIndex == 0.
-// Пока оставим так для ясности.
+import androidx.compose.ui.platform.LocalContext // *** ДОБАВЛЕН ИМПОРТ ***
+import androidx.appcompat.app.AppCompatDelegate // *** ДОБАВЛЕН ИМПОРТ ***
+import android.os.Build // *** ДОБАВЛЕН ИМПОРТ ***
 
 @Composable
 fun WeatherScreen(
     modifier: Modifier = Modifier,
-    viewModel: WeatherViewModel // <--- ПРИНИМАЕМ ViewModel КАК ПАРАМЕТР
+    viewModel: WeatherViewModel
 ) {
-    // val viewModel: WeatherViewModel = hiltViewModel() // <-- УДАЛЯЕМ ЭТУ СТРОКУ
     val uiState by viewModel.uiState.collectAsState()
 
     WeatherScreenContent(
-        modifier = modifier, // modifier уже содержит paddingValues и fillMaxSize из DryDriveApp
+        modifier = modifier, 
         uiState = uiState,
         onEvent = viewModel::onEvent
     )
-
-    Log.d("WeatherScreen", "Checking showRecommendationDialog: ${uiState.showRecommendationDialog}, TitleResId: ${uiState.recommendationDialogTitleResId}")
-    if (uiState.showRecommendationDialog) {
-        val title = uiState.recommendationDialogTitleResId
-        val description = uiState.recommendationDialogDescriptionResId
-        if (title != null && description != null) {
-            RecommendationInfoDialog(
-                titleResId = title,
-                descriptionResId = description,
-                onDismiss = { viewModel.onEvent(WeatherEvent.DismissRecommendationDialog) }
-            )
-        } else {
-            Log.w("WeatherScreen", "RecommendationInfoDialog not shown: titleResId or descriptionResId is null.")
-        }
-    }
 }
 
 
@@ -102,11 +76,24 @@ fun WeatherScreenContent(
         else ""
     }
 
+    if (uiState.showRecommendationDialog) {
+        val title = uiState.recommendationDialogTitleResId
+        val description = uiState.recommendationDialogDescriptionResId
+        if (title != null && description != null) {
+            RecommendationInfoDialog(
+                titleResId = title,
+                descriptionResId = description,
+                onDismiss = { onEvent(WeatherEvent.DismissRecommendationDialog) }
+            )
+        } else {
+            Log.w("WeatherScreenContent", "RecommendationInfoDialog not shown: titleResId or descriptionResId is null.")
+        }
+    }
+
     Column(
-        modifier = modifier // Этот modifier уже содержит padding(innerPadding) и fillMaxSize от DryDriveApp
+        modifier = modifier
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // --- ГИБКАЯ СЕКЦИЯ (прокручиваемая, занимает оставшееся место) ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -117,7 +104,7 @@ fun WeatherScreenContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1f / 1.1f) // Вы можете настроить это соотношение
+                        .aspectRatio(1f / 1.1f)
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.city_background),
@@ -194,8 +181,18 @@ fun WeatherScreenContent(
             }
         }
 
-        // --- СЕКЦИЯ РЕКОМЕНДАЦИЙ ---
-        if (uiState.recommendations.isNotEmpty()) {
+        if (!uiState.recommendations.isEmpty()) {
+            // *** НАЧАЛО БЛОКА ЛОГИРОВАНИЯ ДЛЯ РЕКОМЕНДАЦИЙ (ОБЩИЙ) ***
+            val currentContext = LocalContext.current
+            val currentLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                currentContext.resources.configuration.locales[0]
+            } else {
+                @Suppress("DEPRECATION")
+                currentContext.resources.configuration.locale
+            }
+            val appCompatLocaleTag = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+            Log.d("RecommendationLocale", "Preparing RecommendationsDisplaySection. ContextLocale: $currentLocale, AppCompatLocale: '$appCompatLocaleTag', NumRecommendations: ${uiState.recommendations.size}")
+            // *** КОНЕЦ БЛОКА ЛОГИРОВАНИЯ ***
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -209,7 +206,6 @@ fun WeatherScreenContent(
             }
         }
 
-        // --- СЕКЦИЯ ПРОГНОЗА ---
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -219,7 +215,7 @@ fun WeatherScreenContent(
                     bottom = dimensionResource(R.dimen.spacing_small)
                 )
         ) {
-            val dailyForecastRowHeight = dimensionResource(R.dimen.daily_forecast_row_height) // Используем созданный ресурс
+            val dailyForecastRowHeight = dimensionResource(R.dimen.daily_forecast_row_height)
             when {
                 uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(
                     modifier = Modifier
@@ -242,10 +238,10 @@ fun WeatherScreenContent(
                         textAlign = TextAlign.Center
                     )
                 }
-                uiState.dailyForecasts.isNotEmpty() -> {
-                    DailyForecastRow(forecasts = uiState.dailyForecasts)
+                !uiState.dailyForecasts.isEmpty() -> {
+                    DailyForecastRow(forecastItems = uiState.dailyForecasts)
                 }
-                uiState.weather == null && !uiState.isLoadingForecast && uiState.forecastErrorMessage == null -> {
+                uiState.weather == null -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()

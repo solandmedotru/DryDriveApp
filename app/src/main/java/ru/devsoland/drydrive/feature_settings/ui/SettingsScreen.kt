@@ -36,15 +36,14 @@ private fun appLanguageDisplayName(language: AppLanguage): String {
     return LocalContext.current.getString(language.displayNameResId)
 }
 
-// themeSettingDisplayName function is no longer needed
-
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
-    viewModel: SettingsViewModel = viewModel()
+    settingsViewModel: SettingsViewModel = viewModel(), // Renamed for clarity
+    onLanguageConfirmed: (AppLanguage) -> Unit // *** НОВЫЙ ПАРАМЕТР ***
 ) {
-    val currentLanguage by viewModel.currentLanguage.collectAsState()
-    val currentTheme by viewModel.currentTheme.collectAsState()
+    val currentLanguage by settingsViewModel.currentLanguage.collectAsState()
+    val currentTheme by settingsViewModel.currentTheme.collectAsState()
     val isSystemDark = isSystemInDarkTheme() // Check actual system theme
 
     Column(
@@ -63,7 +62,8 @@ fun SettingsScreen(
                 selected = currentLanguage == language,
                 onClick = {
                     if (currentLanguage != language) {
-                        viewModel.onLanguageSelected(language)
+                        // viewModel.onLanguageSelected(language) // *** УДАЛЕНО ***
+                        onLanguageConfirmed(language) // *** ИСПОЛЬЗУЕМ НОВУЮ ЛЯМБДУ ***
                     }
                 }
             )
@@ -84,13 +84,12 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable {
-                    // Toggle theme when the row is clicked
                     val newTheme = if (currentTheme == ThemeSetting.DARK || (currentTheme == ThemeSetting.SYSTEM && isSystemDark)) {
                         ThemeSetting.LIGHT
                     } else {
                         ThemeSetting.DARK
                     }
-                    viewModel.onThemeSelected(newTheme)
+                    settingsViewModel.onThemeSelected(newTheme) // Оставляем вызов для темы
                 }
                 .padding(vertical = 8.dp), // Adjusted padding for the row
             verticalAlignment = Alignment.CenterVertically,
@@ -108,7 +107,7 @@ fun SettingsScreen(
                     ThemeSetting.SYSTEM -> isSystemDark // Switch reflects system if "System" is chosen
                 },
                 onCheckedChange = { isChecked ->
-                    viewModel.onThemeSelected(if (isChecked) ThemeSetting.DARK else ThemeSetting.LIGHT)
+                    settingsViewModel.onThemeSelected(if (isChecked) ThemeSetting.DARK else ThemeSetting.LIGHT)
                 },
                 modifier = Modifier.padding(start = 16.dp)
             )
@@ -118,7 +117,6 @@ fun SettingsScreen(
 
 /**
  * Вспомогательный Composable для строки с RadioButton и текстом.
- * (Still used for Language selection)
  */
 @Composable
 private fun SelectableRow(

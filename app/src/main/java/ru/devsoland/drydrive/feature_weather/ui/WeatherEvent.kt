@@ -1,8 +1,23 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import ru.devsoland.drydrive.common.model.AppLanguage // Импорт для AppLanguage
 import ru.devsoland.drydrive.data.api.model.City
 
 sealed class WeatherEvent {
+    // Определение Recommendation ПЕРЕМЕЩЕНО ВНУТРЬ WeatherEvent
+    data class Recommendation(
+        val id: String,
+        val textResId: Int,
+        val descriptionResId: Int,
+        val icon: ImageVector,
+        val isActive: Boolean,
+        val activeColor: Color,
+        val activeAlpha: Float = 1.0f, // ДОБАВЛЕНО
+        val inactiveAlpha: Float = 0.6f // ДОБАВЛЕНО
+    ) // Recommendation НЕ ДОЛЖЕН наследовать WeatherEvent
+
     // События поиска городов
     data class SearchQueryChanged(val query: String) : WeatherEvent()
     data class CitySelectedFromSearch(val city: City, val formattedName: String) : WeatherEvent()
@@ -10,16 +25,18 @@ sealed class WeatherEvent {
 
     // События погоды
     object RefreshWeatherClicked : WeatherEvent()
-    object ClearWeatherErrorMessage : WeatherEvent() // Если нужно будет очищать ошибку из UI
+    object ClearWeatherErrorMessage : WeatherEvent()
 
-    // НОВЫЕ События для диалога рекомендаций
-    data class RecommendationClicked(val recommendation: Recommendation) : WeatherEvent() // Добавлено
-    object DismissRecommendationDialog : WeatherEvent() // Добавлено
+    // События для диалога рекомендаций
+    // Теперь Recommendation - это WeatherEvent.Recommendation, что будет правильно разрешаться
+    data class RecommendationClicked(val recommendation: Recommendation) : WeatherEvent()
+    object DismissRecommendationDialog : WeatherEvent()
 
-    object ShowSearchField : WeatherEvent() // При клике на иконку лупы
-    object HideSearchFieldAndDismissDropdown : WeatherEvent() // При клике на "ОК" или при выборе города
-
+    object ShowSearchField : WeatherEvent()
+    object HideSearchFieldAndDismissDropdown : WeatherEvent()
 
     data class BottomNavItemSelected(val index: Int) : WeatherEvent()
-    // Можно добавить и другие события по мере необходимости
+
+    // Новое событие для смены языка
+    data class ChangeLanguage(val language: AppLanguage) : WeatherEvent()
 }
