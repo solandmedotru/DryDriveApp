@@ -1,6 +1,6 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
-import androidx.compose.animation.core.copy
+// Все ваши существующие импорты для HomeScreenContent ...
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -23,26 +23,71 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.error
+// import androidx.compose.ui.semantics.error // Похоже, этот импорт не используется
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-// ... другие существующие импорты ...
 import androidx.compose.ui.unit.sp
 import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.feature_weather.ui.composables.DailyForecastPlaceholder
 import ru.devsoland.drydrive.feature_weather.ui.composables.DailyForecastRow
 import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationsDisplaySection
 import ru.devsoland.drydrive.feature_weather.ui.composables.WeatherDetails
-// НОВЫЙ ИМПОРТ:
 import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationInfoDialog
 import ru.devsoland.drydrive.ui.theme.CityBackgroundOverlay
 import java.util.Locale
 
+// НОВЫЕ ИМПОРТЫ:
+import android.util.Log
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import ru.devsoland.drydrive.common.ui.navigation.DryDriveBottomNavigationBar
+import ru.devsoland.drydrive.common.ui.navigation.DryDriveTopAppBar
+
+// Точка входа для экрана Погоды
+
+// Эта функция теперь становится более простой "оберткой", если она вообще нужна отдельно.
+// Или можно ее логику (сбор uiState и отображение диалога) перенести прямо в DryDriveApp.kt
+// для случая selectedItemIndex == 0.
+// Пока оставим так для ясности.
+
 @Composable
-fun HomeScreenContent(
+fun WeatherScreen(
+    modifier: Modifier = Modifier,
+    viewModel: WeatherViewModel // <--- ПРИНИМАЕМ ViewModel КАК ПАРАМЕТР
+) {
+    // val viewModel: WeatherViewModel = hiltViewModel() // <-- УДАЛЯЕМ ЭТУ СТРОКУ
+    val uiState by viewModel.uiState.collectAsState()
+
+    WeatherScreenContent(
+        modifier = modifier, // modifier уже содержит paddingValues и fillMaxSize из DryDriveApp
+        uiState = uiState,
+        onEvent = viewModel::onEvent
+    )
+
+    Log.d("WeatherScreen", "Checking showRecommendationDialog: ${uiState.showRecommendationDialog}, TitleResId: ${uiState.recommendationDialogTitleResId}")
+    if (uiState.showRecommendationDialog) {
+        val title = uiState.recommendationDialogTitleResId
+        val description = uiState.recommendationDialogDescriptionResId
+        if (title != null && description != null) {
+            RecommendationInfoDialog(
+                titleResId = title,
+                descriptionResId = description,
+                onDismiss = { viewModel.onEvent(WeatherEvent.DismissRecommendationDialog) }
+            )
+        } else {
+            Log.w("WeatherScreen", "RecommendationInfoDialog not shown: titleResId or descriptionResId is null.")
+        }
+    }
+}
+
+
+@Composable
+fun WeatherScreenContent(
     modifier: Modifier = Modifier,
     uiState: WeatherUiState,
-    onEvent: (WeatherEvent) -> Unit // <--- ДОБАВЬТЕ ЭТОТ ПАРАМЕТР, ЕСЛИ ЕГО НЕТ
+    onEvent: (WeatherEvent) -> Unit
 ) {
     val carImageResId = when (uiState.weather?.weather?.getOrNull(0)?.main?.lowercase(Locale.ROOT)) {
         "rain", "snow", "thunderstorm", "drizzle", "mist", "fog" -> R.drawable.car_dirty
@@ -57,158 +102,160 @@ fun HomeScreenContent(
         else ""
     }
 
-    Box(modifier = modifier
-        .fillMaxSize()
-        .background(MaterialTheme.colorScheme.background)) {
-        // Основной контент экрана в Column для скролла
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-        ) {
-            // Секция с фоном города и текущей погодой/машиной
-            Box(modifier = Modifier
+    Column(
+        modifier = modifier // Этот modifier уже содержит padding(innerPadding) и fillMaxSize от DryDriveApp
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // --- ГИБКАЯ СЕКЦИЯ (прокручиваемая, занимает оставшееся место) ---
+        Box(
+            modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f / 1.1f)
-            ) {
-                // ... ваш код для фона и информации о погоде ...
-                Image(
-                    painter = painterResource(id = R.drawable.city_background),
-                    contentDescription = stringResource(R.string.city_background_description),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(modifier = Modifier
-                    .fillMaxSize()
-                    .background(CityBackgroundOverlay))
-
-                Column(modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))) {
-                    Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_large)))
-                    when {
-                        uiState.isLoadingWeather && uiState.weather == null -> CircularProgressIndicator(
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .padding(vertical = 50.dp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        uiState.weatherErrorMessage != null && uiState.weather == null -> Text(
-                            text = uiState.weatherErrorMessage!!,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 50.dp)
-                        )
-                        uiState.weather != null -> {
-                            WeatherDetails(weather = uiState.weather)
-                            Spacer(modifier = Modifier.height(
-                                dimensionResource(
-                                    R.dimen.spacing_medium
-                                )
-                            ))
-                            if (washRecommendation.isNotBlank()) {
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f / 1.1f) // Вы можете настроить это соотношение
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.city_background),
+                        contentDescription = stringResource(R.string.city_background_description),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(CityBackgroundOverlay)
+                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))
+                    ) {
+                        Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_large)))
+                        when {
+                            uiState.isLoadingWeather && uiState.weather == null -> CircularProgressIndicator(
+                                modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(vertical = 50.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            uiState.weatherErrorMessage != null && uiState.weather == null -> Text(
+                                text = uiState.weatherErrorMessage,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 50.dp)
+                            )
+                            uiState.weather != null -> {
+                                WeatherDetails(weather = uiState.weather)
+                                Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_medium)))
+                                if (washRecommendation.isNotBlank()) {
+                                    Text(
+                                        text = washRecommendation,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = dimensionResource(R.dimen.font_size_caption).value.sp,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                            else -> Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 50.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
                                 Text(
-                                    text = washRecommendation,
+                                    text = stringResource(R.string.select_city_prompt),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = dimensionResource(R.dimen.font_size_caption).value.sp,
-                                    modifier = Modifier.fillMaxWidth()
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
-                        else -> Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(150.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = stringResource(R.string.select_city_prompt),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(top = 50.dp)
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (uiState.weather != null) {
+                            Image(
+                                painter = painterResource(id = carImageResId),
+                                contentDescription = carContentDescription,
+                                modifier = Modifier
+                                    .fillMaxWidth(0.8f)
+                                    .aspectRatio(16f / 9f)
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(bottom = dimensionResource(R.dimen.spacing_large)),
+                                contentScale = ContentScale.Fit
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (uiState.weather != null) {
-                        Image(
-                            painter = painterResource(id = carImageResId),
-                            contentDescription = carContentDescription,
-                            modifier = Modifier
-                                .fillMaxWidth(0.8f)
-                                .aspectRatio(16f / 9f)
-                                .align(Alignment.CenterHorizontally)
-                                .padding(bottom = dimensionResource(R.dimen.spacing_large)),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
                 }
             }
+        }
 
-            // Секция рекомендаций
-            Column(modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))
-                .padding(top = dimensionResource(R.dimen.spacing_large))) {
-                // ИСПРАВЛЕННЫЙ ВЫЗОВ:
-                // Убедитесь, что RecommendationsDisplaySection ПЕРЕДАЕТ onEvent дальше,
-                // если RecommendationItem находится внутри него
+        // --- СЕКЦИЯ РЕКОМЕНДАЦИЙ ---
+        if (uiState.recommendations.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))
+                    .padding(top = dimensionResource(R.dimen.spacing_medium))
+            ) {
                 RecommendationsDisplaySection(
                     recommendations = uiState.recommendations,
-                    onEvent = onEvent // <--- ПЕРЕДАЕМ onEvent СЮДА
+                    onEvent = onEvent
                 )
             }
+        }
 
-            // Секция прогноза
-            Column(modifier = Modifier
+        // --- СЕКЦИЯ ПРОГНОЗА ---
+        Column(
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))
                 .padding(
-                    top = dimensionResource(R.dimen.spacing_large),
-                    bottom = dimensionResource(R.dimen.spacing_large)
-                )) {
-                // ... ваш код для секции прогноза ...
-                when {
-                    uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(
+                    top = dimensionResource(R.dimen.spacing_medium),
+                    bottom = dimensionResource(R.dimen.spacing_small)
+                )
+        ) {
+            val dailyForecastRowHeight = dimensionResource(R.dimen.daily_forecast_row_height) // Используем созданный ресурс
+            when {
+                uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(dailyForecastRowHeight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    DailyForecastPlaceholder()
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                }
+                uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty() -> Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(dailyForecastRowHeight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.forecast_unavailable),
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                uiState.dailyForecasts.isNotEmpty() -> {
+                    DailyForecastRow(forecasts = uiState.dailyForecasts)
+                }
+                uiState.weather == null && !uiState.isLoadingForecast && uiState.forecastErrorMessage == null -> {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp),
+                            .height(dailyForecastRowHeight),
                         contentAlignment = Alignment.Center
                     ) {
-                        DailyForecastPlaceholder()
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
-                    }
-                    uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty() -> Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.forecast_unavailable),
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    uiState.dailyForecasts.isNotEmpty() -> {
-                        DailyForecastRow(forecasts = uiState.dailyForecasts)
-                    }
-                    else -> {
                         DailyForecastPlaceholder()
                     }
                 }
             }
-        } // Конец Column для скролла
-
-        // ДОБАВЬТЕ ЭТОТ БЛОК ДЛЯ ОТОБРАЖЕНИЯ ДИАЛОГА ВНУТРИ ОСНОВНОГО BOX:
-        if (uiState.showRecommendationDialog) {
-            RecommendationInfoDialog(
-                titleResId = uiState.recommendationDialogTitleResId,
-                descriptionResId = uiState.recommendationDialogDescriptionResId,
-                onDismiss = { onEvent(WeatherEvent.DismissRecommendationDialog) }
-            )
         }
-    } // Конец корневого Box
+    }
 }
-

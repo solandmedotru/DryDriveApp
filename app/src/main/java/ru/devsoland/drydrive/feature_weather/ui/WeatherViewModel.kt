@@ -171,6 +171,13 @@ class WeatherViewModel @Inject constructor(
                 }
             }
 
+            is WeatherEvent.BottomNavItemSelected -> {
+                _uiState.update { it.copy(selectedBottomNavIndex = event.index) }
+                // TODO: Добавьте здесь логику навигации или обновления контента,
+                // если разные вкладки должны показывать разное
+                Log.d("WeatherViewModel", "BottomNavItemSelected: ${event.index}")
+            }
+
             WeatherEvent.HideSearchFieldAndDismissDropdown -> {
                 _uiState.update {
                     it.copy(
@@ -220,7 +227,8 @@ class WeatherViewModel @Inject constructor(
                 it.copy(weatherErrorMessage = null, forecastErrorMessage = null)
             }
             is WeatherEvent.RecommendationClicked -> {
-                Log.d(TAG, "RecommendationClicked: ${event.recommendation.id}")
+                Log.d(TAG, "RecommendationClicked: ${event.recommendation.id}, textResId: ${event.recommendation.textResId}, descResId: ${event.recommendation.descriptionResId}")
+                val oldState = _uiState.value
                 _uiState.update {
                     it.copy(
                         showRecommendationDialog = true,
@@ -228,7 +236,10 @@ class WeatherViewModel @Inject constructor(
                         recommendationDialogDescriptionResId = event.recommendation.descriptionResId
                     )
                 }
+                Log.d(TAG, "UiState updated. OLD showDialog: ${oldState.showRecommendationDialog}, NEW showDialog: ${_uiState.value.showRecommendationDialog}")
+                Log.d(TAG, "UiState NEW titleResId: ${_uiState.value.recommendationDialogTitleResId}, NEW descResId: ${_uiState.value.recommendationDialogDescriptionResId}")
             }
+
             WeatherEvent.DismissRecommendationDialog -> {
                 Log.d(TAG, "DismissRecommendationDialog")
                 _uiState.update {

@@ -26,4 +26,5 @@ data class WeatherUiState(
     val showRecommendationDialog: Boolean = false,
     @StringRes val recommendationDialogTitleResId: Int? = null,
     @StringRes val recommendationDialogDescriptionResId: Int? = null,
+    val selectedBottomNavIndex: Int = 0, // 0 - для "Домой" по умолчанию
 )

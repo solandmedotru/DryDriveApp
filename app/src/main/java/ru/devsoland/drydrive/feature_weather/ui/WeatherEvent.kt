@@ -19,5 +19,7 @@ sealed class WeatherEvent {
     object ShowSearchField : WeatherEvent() // При клике на иконку лупы
     object HideSearchFieldAndDismissDropdown : WeatherEvent() // При клике на "ОК" или при выборе города
 
+
+    data class BottomNavItemSelected(val index: Int) : WeatherEvent()
     // Можно добавить и другие события по мере необходимости
 }

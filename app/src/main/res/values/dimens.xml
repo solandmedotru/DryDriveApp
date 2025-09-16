@@ -38,4 +38,5 @@
     <dimen name="chip_min_height">80dp</dimen>
 
     <dimen name="top_app_bar_height">56dp</dimen>
+    <dimen name="daily_forecast_row_height">120dp</dimen>
 </resources>

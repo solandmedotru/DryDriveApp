@@ -7,27 +7,29 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+// import androidx.activity.viewModels // <-- УБИРАЕМ, если ViewModel получается в DryDriveApp
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.lifecycleScope // ОСТАВЛЯЕМ, если есть recreateActivityEvent
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.launch // ОСТАВЛЯЕМ, если есть recreateActivityEvent
 import kotlinx.coroutines.runBlocking
 import ru.devsoland.drydrive.common.util.setAppLocale
 import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
 import ru.devsoland.drydrive.di.UserPreferencesEntryPoint
-import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel
+import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel // <-- УБИРАЕМ, если ViewModel не создается здесь
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
 
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
     private val weatherViewModel: WeatherViewModel by viewModels()
 
     override fun attachBaseContext(newBase: Context) {
@@ -104,6 +106,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ... ваш код onCreate для логов локали ...
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             Log.d(
                 "MainActivityLifecycle",
@@ -140,7 +143,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    DryDriveApp(viewModel = weatherViewModel)
+                    DryDriveApp(weatherViewModel = weatherViewModel) // <--- ПЕРЕДАЕМ ViewModel
                 }
             }
         }

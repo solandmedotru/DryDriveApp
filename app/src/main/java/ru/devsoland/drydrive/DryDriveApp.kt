@@ -26,21 +26,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.lifecycle.viewmodel.compose.viewModel
+// import androidx.lifecycle.viewmodel.compose.viewModel // viewModel будет инжектироваться в DryDriveApp
 import kotlinx.coroutines.launch
 import ru.devsoland.drydrive.common.ui.navigation.DryDriveBottomNavigationBar
 import ru.devsoland.drydrive.common.ui.navigation.DryDriveTopAppBar
 import ru.devsoland.drydrive.feature_map.ui.MapScreenPlaceholder
 import ru.devsoland.drydrive.feature_settings.ui.SettingsScreen
-import ru.devsoland.drydrive.feature_weather.ui.HomeScreenContent
-import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent
+// ЗАМЕНЯЕМ WeatherScreenContent на WeatherScreen
+import ru.devsoland.drydrive.feature_weather.ui.WeatherScreen
 import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
+import androidx.hilt.navigation.compose.hiltViewModel // Для получения ViewModel в Composable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DryDriveApp( viewModel: WeatherViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
+fun DryDriveApp(
+    weatherViewModel: WeatherViewModel
+) {
+
+    val uiState by weatherViewModel.uiState.collectAsState() // Собираем uiState здесь
+
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var selectedItemIndex by rememberSaveable { mutableStateOf(0) }
@@ -51,7 +56,7 @@ fun DryDriveApp( viewModel: WeatherViewModel) {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.systemBarsPadding(), // Учитываем системные бары
+                modifier = Modifier.systemBarsPadding(),
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerContentColor = MaterialTheme.colorScheme.onSurface
             ) {
@@ -64,20 +69,20 @@ fun DryDriveApp( viewModel: WeatherViewModel) {
         },
         scrimColor = MaterialTheme.colorScheme.scrim
     ) {
-        Surface( // Обертка для основного контента, чтобы scrim корректно работал
+        Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background // Фон для основного контента
+            color = MaterialTheme.colorScheme.background
         ) {
             Scaffold(
                 modifier = Modifier
                     .fillMaxSize()
-                    .navigationBarsPadding() // Отступ для навигационного бара
-                    .statusBarsPadding(), // Отступ для статус-бара
-                containerColor = MaterialTheme.colorScheme.background, // Явный цвет фона Scaffold
+                    .navigationBarsPadding()
+                    .statusBarsPadding(),
+                containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
                     DryDriveTopAppBar(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent, // Передаем ссылку на onEvent из ViewModel
+                        uiState = uiState, // Используем uiState из общей ViewModel
+                        onEvent = weatherViewModel::onEvent,
                         onMenuClick = { scope.launch { drawerState.open() } }
                     )
                 },
@@ -87,17 +92,22 @@ fun DryDriveApp( viewModel: WeatherViewModel) {
                         onItemSelected = { index -> selectedItemIndex = index }
                     )
                 }
-            ) { paddingValues ->
+            ) { paddingValues -> // paddingValues от ЭТОГО Scaffold
+                Log.d("DryDriveApp_Scaffold", "PaddingValues: Top=${paddingValues.calculateTopPadding()}, Bottom=${paddingValues.calculateBottomPadding()}")
                 when (selectedItemIndex) {
-                    0 -> HomeScreenContent(
-                        modifier = Modifier.padding(paddingValues),
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent
+                    0 -> // Экран Погоды
+                        WeatherScreen(
+                            modifier = Modifier.padding(paddingValues).fillMaxSize(), // Передаем paddingValues
+                            viewModel = weatherViewModel // Передаем ту же ViewModel, чтобы uiState был синхронизирован
+                            // или WeatherScreen может сам получить через hiltViewModel()
+                            // если вы хотите разные инстансы или он не нужен в DryDriveApp напрямую
+                        )
+                    1 -> MapScreenPlaceholder(
+                        modifier = Modifier.padding(paddingValues).fillMaxSize()
                     )
-                    1 -> MapScreenPlaceholder(modifier = Modifier.padding(paddingValues))
                     2 -> SettingsScreen(
-                        modifier = Modifier.padding(paddingValues),
-                        viewModel = viewModel // SettingsScreen уже получает viewModel
+                        modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                        viewModel = weatherViewModel // Передаем ту же ViewModel
                     )
                 }
             }
@@ -111,10 +121,12 @@ fun DryDriveApp( viewModel: WeatherViewModel) {
 fun DryDriveAppPreview() {
     DryDriveTheme {
         Surface(color = MaterialTheme.colorScheme.background) {
-            // Для превью можно создать фейковый ViewModel или передать null/пустой uiState, если ваш UI это обрабатывает
-            // Либо используйте hiltViewModel() для превью, если настроено.
-            val previewViewModel: WeatherViewModel = viewModel()
-            DryDriveApp(viewModel = previewViewModel)
+            // Для превью потребуется создать мок/фейк WeatherViewModel,
+            // так как hiltViewModel() не будет работать здесь без доп. настройки для превью.
+            // Например:
+            // val fakeViewModel = object : WeatherViewModel(...) { /* ... */ }
+            // DryDriveApp(viewModel = fakeViewModel)
+            Text("Preview of DryDriveApp requires a WeatherViewModel instance.")
         }
     }
 }
