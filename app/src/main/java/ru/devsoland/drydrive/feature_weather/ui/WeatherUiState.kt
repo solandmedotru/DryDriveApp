@@ -1,5 +1,6 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
+import androidx.annotation.StringRes
 import ru.devsoland.drydrive.data.api.model.City
 import ru.devsoland.drydrive.data.api.model.Weather
 import ru.devsoland.drydrive.common.model.AppLanguage
@@ -20,5 +21,8 @@ data class WeatherUiState(
     val forecastErrorMessage: String? = null,
     val currentLanguageCode: String = AppLanguage.SYSTEM.code,
     val isInitialLoading: Boolean = true,
-    val recommendations: List<Recommendation> = emptyList()
+    val recommendations: List<Recommendation> = emptyList(),
+    val showRecommendationDialog: Boolean = false,
+    @StringRes val recommendationDialogTitleResId: Int? = null,
+    @StringRes val recommendationDialogDescriptionResId: Int? = null
 )

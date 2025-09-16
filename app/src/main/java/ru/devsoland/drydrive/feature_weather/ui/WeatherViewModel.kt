@@ -1,10 +1,13 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
+import android.app.Application
 import android.os.Build
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -39,27 +42,32 @@ import javax.inject.Inject
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsCar // Для шин
-import androidx.compose.material.icons.filled.LocalDrink // Для воды
-import androidx.compose.material.icons.filled.Umbrella // Для зонта
-import androidx.compose.material.icons.filled.WbSunny // Для УФ и общей солнечной погоды
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.LocalDrink
+import androidx.compose.material.icons.filled.Umbrella
+import androidx.compose.material.icons.filled.WbSunny
+// Импортируйте иконки для НОВЫХ рекомендаций, если они нужны
+import androidx.compose.material.icons.filled.Thermostat // для Dress warmly
+import androidx.compose.material.icons.filled.AccessibilityNew // для Limit activity (пример)
+import androidx.compose.material.icons.filled.Build // для Check tires (альтернатива DirectionsCar)
+import androidx.compose.material.icons.filled.Warning // для Careful roads
+import androidx.compose.material.icons.filled.Air // для Ventilate
+import androidx.compose.material.icons.filled.Spa // для Moisturizer
+import androidx.compose.material.icons.filled.DryCleaning // для Light clothes (пример)
+
 import ru.devsoland.drydrive.BuildConfig
 import ru.devsoland.drydrive.R
 
-// Важно: Убедитесь, что R класс вашего проекта импортирован, если Android Studio не сделала это автоматически
-// import ru.devsoland.drydrive.R
-
-// Data class для отображения дневного прогноза (использует ID ресурса drawable)
 data class DisplayDayWeather(
     val dayShort: String,
     val iconRes: Int,
     val temperature: String
 )
 
-// Data class для рекомендаций (использует ImageVector)
 data class Recommendation(
     val id: String,
-    val text: String,
+    @StringRes val textResId: Int, // ID ресурса для текста
+    @StringRes val descriptionResId: Int, // ID ресурса для описания
     val icon: ImageVector,
     val isActive: Boolean = false,
     val activeColor: Color,
@@ -69,6 +77,7 @@ data class Recommendation(
 
 @HiltViewModel
 class WeatherViewModel @Inject constructor(
+    private val application: Application,
     private val weatherApi: WeatherApi,
     private val userPreferencesManager: UserPreferencesManager
 ) : ViewModel() {
@@ -82,14 +91,7 @@ class WeatherViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "DryDriveViewModel"
-        // TODO: Локализовать все эти сообщения
-        const val MSG_CITIES_NOT_FOUND = "Города не найдены: "
-        const val MSG_CITY_SEARCH_ERROR = "Ошибка поиска: "
-        const val MSG_CITY_NOT_FOUND_WEATHER = "Город не найден: "
-        const val MSG_WEATHER_LOAD_ERROR = "Ошибка при загрузке погоды: "
-        const val MSG_FORECAST_LOAD_ERROR = "Ошибка загрузки прогноза: "
-        const val MSG_COORDINATES_NOT_FOUND = "Координаты для прогноза не найдены."
-        const val DEFAULT_CITY_FALLBACK = "Moscow" // Можно вынести в ресурсы, если нужно менять
+        const val DEFAULT_CITY_FALLBACK = "Moscow"
     }
 
     val currentLanguage: StateFlow<AppLanguage> = userPreferencesManager.selectedLanguageFlow
@@ -105,13 +107,11 @@ class WeatherViewModel @Inject constructor(
     init {
         currentLanguage
             .onEach { appLang ->
-                _uiState.update { currentState ->
-                    if (currentState.currentLanguageCode != appLang.code) {
-                        Log.d(TAG, "Язык изменен через коллектор: ${appLang.code}")
-                        currentState.copy(currentLanguageCode = appLang.code)
-                    } else {
-                        currentState
-                    }
+                if (_uiState.value.currentLanguageCode != appLang.code) {
+                    Log.d(TAG, "currentLanguage.onEach: Код языка в UiState обновлен на: ${appLang.code}")
+                    _uiState.update { it.copy(currentLanguageCode = appLang.code) }
+                    // Рекомендации будут обновлены, когда fetchCurrentWeatherAndForecast
+                    // вызовет generateRecommendations после смены языка и загрузки данных.
                 }
             }
             .launchIn(viewModelScope)
@@ -148,15 +148,15 @@ class WeatherViewModel @Inject constructor(
     private fun formatCityNameInternal(city: City, langCode: String): String {
         val displayName = when {
             langCode.isNotBlank() && city.localNames?.containsKey(langCode) == true -> city.localNames[langCode]
-            city.localNames?.containsKey("en") == true -> city.localNames["en"] // Фоллбэк на английский
+            city.localNames?.containsKey("en") == true -> city.localNames["en"]
             else -> city.name
-        } ?: city.name // Elvis на случай, если city.name тоже null (хотя API должен его давать)
+        } ?: city.name
         return "$displayName, ${city.country}" + if (!city.state.isNullOrBlank()) ", ${city.state}" else ""
     }
 
     private fun getApiLangCode(): String? {
         val langCode = _uiState.value.currentLanguageCode
-        return if (langCode.isEmpty()) null else langCode // OpenWeatherMap ожидает null или код языка, не пустую строку
+        return if (langCode.isEmpty()) null else langCode
     }
 
     fun onEvent(event: WeatherEvent) {
@@ -166,7 +166,7 @@ class WeatherViewModel @Inject constructor(
             WeatherEvent.DismissCitySearchDropDown -> _uiState.update { it.copy(isSearchDropDownExpanded = false) }
             WeatherEvent.RefreshWeatherClicked -> {
                 _uiState.value.selectedCityObject?.let {
-                    fetchCurrentWeatherAndForecast(it) // Язык API будет взят из getApiLangCode()
+                    fetchCurrentWeatherAndForecast(it)
                 } ?: run {
                     Log.w(TAG, "Кнопка Refresh нажата, но город не выбран. Загрузка города по умолчанию.")
                     findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true)
@@ -174,6 +174,28 @@ class WeatherViewModel @Inject constructor(
             }
             WeatherEvent.ClearWeatherErrorMessage -> _uiState.update {
                 it.copy(weatherErrorMessage = null, forecastErrorMessage = null)
+            }
+
+            is WeatherEvent.RecommendationClicked -> {
+                Log.d(TAG, "RecommendationClicked: ${event.recommendation.id}")
+                _uiState.update {
+                    it.copy(
+                        showRecommendationDialog = true,
+                        // Используем textResId и descriptionResId, как мы определили в Recommendation data class
+                        recommendationDialogTitleResId = event.recommendation.textResId,
+                        recommendationDialogDescriptionResId = event.recommendation.descriptionResId
+                    )
+                }
+            }
+            WeatherEvent.DismissRecommendationDialog -> {
+                Log.d(TAG, "DismissRecommendationDialog")
+                _uiState.update {
+                    it.copy(
+                        showRecommendationDialog = false,
+                        recommendationDialogTitleResId = null, // Сбрасываем ID, чтобы избежать случайного показа старых данных
+                        recommendationDialogDescriptionResId = null
+                    )
+                }
             }
         }
     }
@@ -187,11 +209,11 @@ class WeatherViewModel @Inject constructor(
             )
         }
         citySearchJob?.cancel()
-        if (query.length > 2) { // Начинаем поиск после ввода 3 символов
+        if (query.length > 2) {
             _uiState.update { it.copy(isLoadingCities = true) }
             citySearchJob = viewModelScope.launch {
                 val apiLang = getApiLangCode()
-                delay(500) // Debounce для предотвращения слишком частых запросов
+                delay(500)
                 try {
                     val results = withContext(Dispatchers.IO) {
                         weatherApi.searchCities(query = query, apiKey = apiKey, lang = apiLang)
@@ -200,8 +222,8 @@ class WeatherViewModel @Inject constructor(
                         it.copy(
                             citySearchResults = results,
                             isLoadingCities = false,
-                            citySearchErrorMessage = if (results.isEmpty()) "$MSG_CITIES_NOT_FOUND'$query'" else null,
-                            isSearchDropDownExpanded = results.isNotEmpty() || (results.isEmpty() && query.isNotEmpty()) // Показывать выпадашку даже если пусто, но есть запрос
+                            citySearchErrorMessage = if (results.isEmpty()) application.applicationContext.getString(R.string.city_not_found) else null,
+                            isSearchDropDownExpanded = results.isNotEmpty() || (results.isEmpty() && query.isNotEmpty())
                         )
                     }
                 } catch (e: Exception) {
@@ -209,7 +231,7 @@ class WeatherViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoadingCities = false,
-                            citySearchErrorMessage = "$MSG_CITY_SEARCH_ERROR${e.localizedMessage}"
+                            citySearchErrorMessage = application.applicationContext.getString(R.string.error_loading_cities)
                         )
                     }
                 }
@@ -220,18 +242,18 @@ class WeatherViewModel @Inject constructor(
     }
 
     private fun handleCitySelected(city: City, formattedName: String) {
-        initialLoadJob?.cancel() // Отменяем начальную загрузку, если она еще идет
+        initialLoadJob?.cancel()
         _uiState.update {
             it.copy(
                 selectedCityObject = city,
                 cityForDisplay = formattedName,
-                searchQuery = formattedName, // Обновляем поисковый запрос, чтобы отразить выбранный город
+                searchQuery = formattedName,
                 citySearchResults = emptyList(),
                 isSearchDropDownExpanded = false,
                 weatherErrorMessage = null,
                 forecastErrorMessage = null,
-                dailyForecasts = emptyList(), // Очищаем старый прогноз
-                isInitialLoading = false // Пользовательское взаимодействие означает, что начальная загрузка завершена или переопределена
+                dailyForecasts = emptyList(),
+                isInitialLoading = false
             )
         }
         fetchCurrentWeatherAndForecast(city)
@@ -249,12 +271,11 @@ class WeatherViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoadingWeather = true,
-                    weather = null, // Очищаем старую погоду во время загрузки
+                    weather = null,
                     weatherErrorMessage = null,
                     isLoadingForecast = true,
-                    dailyForecasts = emptyList(), // Очищаем старый прогноз
+                    dailyForecasts = emptyList(),
                     forecastErrorMessage = null
-                    // isInitialLoading здесь не трогаем, он будет false в конце этой функции
                 )
             }
 
@@ -269,7 +290,11 @@ class WeatherViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка загрузки текущей погоды: ${e.message}", e)
-                weatherFetchError = if (e.message?.contains("404") == true) "$MSG_CITY_NOT_FOUND_WEATHER${city.name}" else "$MSG_WEATHER_LOAD_ERROR${e.localizedMessage}"
+                weatherFetchError = if (e.message?.contains("404", ignoreCase = true) == true || e.message?.contains("city not found", ignoreCase = true) == true) {
+                    application.applicationContext.getString(R.string.city_not_found)
+                } else {
+                    application.applicationContext.getString(R.string.error_loading_weather)
+                }
             }
 
             if (city.lat != 0.0 && city.lon != 0.0) {
@@ -280,24 +305,24 @@ class WeatherViewModel @Inject constructor(
                     processedForecasts = processForecastResponse(forecastResponse, apiLang)
                 } catch (e: Exception) {
                     Log.e(TAG, "Ошибка загрузки/обработки прогноза: ${e.message}", e)
-                    forecastFetchError = "$MSG_FORECAST_LOAD_ERROR${e.localizedMessage}"
+                    forecastFetchError = application.applicationContext.getString(R.string.error_loading_weather)
                 }
             } else {
                 Log.w(TAG, "Пропуск прогноза: Неверные Lat/Lon для ${city.name}.")
-                forecastFetchError = MSG_COORDINATES_NOT_FOUND
+                forecastFetchError = application.applicationContext.getString(R.string.error_loading_weather) // Или более специфичная строка
             }
 
             val currentRecommendations = generateRecommendations(fetchedWeather, processedForecasts)
 
             _uiState.update {
                 it.copy(
-                    weather = fetchedWeather ?: it.weather, // Сохраняем старую погоду, если новая загрузка не удалась
+                    weather = fetchedWeather ?: it.weather,
                     dailyForecasts = processedForecasts,
                     isLoadingWeather = false,
                     isLoadingForecast = false,
                     weatherErrorMessage = weatherFetchError,
                     forecastErrorMessage = forecastFetchError,
-                    isInitialLoading = false, // Последовательность начальной загрузки завершена
+                    isInitialLoading = false,
                     recommendations = currentRecommendations
                 )
             }
@@ -308,17 +333,16 @@ class WeatherViewModel @Inject constructor(
     private fun processForecastResponse(response: ForecastResponse, apiLanguageCode: String?): List<DisplayDayWeather> {
         val dailyData = mutableMapOf<String, MutableList<ForecastListItem>>()
         val displayLocale = when {
-            apiLanguageCode.isNullOrEmpty() -> Locale.getDefault() // Используем язык системы, если API язык не указан
+            apiLanguageCode.isNullOrEmpty() -> Locale.getDefault()
             else -> Locale(apiLanguageCode)
         }
 
         val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH).apply {
-            timeZone = TimeZone.getTimeZone("UTC") // Даты от API приходят в UTC
+            timeZone = TimeZone.getTimeZone("UTC")
         }
         val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }
-        // Формат для отображения дня недели будет использовать локаль устройства или выбранный язык
         val dayOfWeekFormat = SimpleDateFormat("E", displayLocale)
 
         response.list.forEach { item ->
@@ -333,124 +357,159 @@ class WeatherViewModel @Inject constructor(
         }
 
         val displayForecasts = mutableListOf<DisplayDayWeather>()
-        // Получаем текущий день в UTC для фильтрации, чтобы не показывать сегодняшний день (т.к. прогноз обычно на следующие дни)
         val currentUtcDayKey = dayKeyFormat.format(Date())
 
         dailyData.entries
             .asSequence()
-            .sortedBy { it.key } // Сортируем по дате
-            .filter { entry -> entry.key > currentUtcDayKey } // Берем только будущие дни
-            .take(5) // Берем следующие 5 дней
+            .sortedBy { it.key }
+            .filter { entry -> entry.key > currentUtcDayKey }
+            .take(5)
             .forEach { entry ->
                 val dayItems = entry.value
-                // Пытаемся найти запись на 12:00 UTC как репрезентативную для дня
                 val targetItem = dayItems.find { it.dtTxt.substring(11, 13) == "12" } ?: dayItems.firstOrNull()
 
                 targetItem?.let { item ->
                     inputFormat.parse(item.dtTxt)?.let { itemUtcDate ->
-                        // Важно: Чтобы день недели отображался на языке пользователя, SimpleDateFormat должен быть инициализирован с Locale пользователя
-                        // DayOfWeekFormat уже использует displayLocale (либо язык API, либо системный)
                         val dayLabel = dayOfWeekFormat.format(itemUtcDate).replaceFirstChar {
                             if (it.isLowerCase()) it.titlecase(displayLocale) else it.toString()
                         }
                         val iconRes = mapWeatherConditionToIcon(item.weather.firstOrNull()?.main, item.weather.firstOrNull()?.icon)
-                        val temperature = "${item.main.temp.toInt()}°" // Округляем температуру
+                        val temperature = "${item.main.temp.toInt()}°"
                         displayForecasts.add(DisplayDayWeather(dayLabel, iconRes, temperature))
                     }
                 }
             }
         return displayForecasts
     }
-    // Эта функция возвращает ID ресурса drawable для иконок прогноза
+
     private fun mapWeatherConditionToIcon(condition: String?, iconCode: String?): Int {
-        // TODO: Доработать маппинг иконок и добавить все необходимые drawable ресурсы
         return when (iconCode) {
-            "01d" -> R.drawable.ic_sun_filled // Ясно (день)
-            "01n" -> R.drawable.ic_moon_filled // Ясно (ночь) - нужна иконка луны
-            "02d" -> R.drawable.ic_sun_cloud_filled // Малооблачно (день) - нужна иконка
-            "02n" -> R.drawable.ic_moon_cloud_filled // Малооблачно (ночь) - нужна иконка
-            "03d", "03n" -> R.drawable.ic_light_cloud// Рассеянные облака
-            "04d", "04n" -> R.drawable.ic_clouds_filled // Облачно, пасмурно - нужна иконка
-            "09d", "09n" -> R.drawable.ic_rain_heavy_filled // Ливень - нужна иконка
-            "10d" -> R.drawable.ic_sun_rain_filled // Дождь (день) - нужна иконка
-            "10n" -> R.drawable.ic_moon_rain_filled // Дождь (ночь) - нужна иконка
-            "11d", "11n" -> R.drawable.ic_thunderstorm_filled // Гроза - нужна иконка
-            "13d", "13n" -> R.drawable.ic_snow_filled // Снег - нужна иконка
-            "50d", "50n" -> R.drawable.ic_fog_filled // Туман - нужна иконка
-            else -> R.drawable.ic_sun_cloud_filled // Иконка по умолчанию
+            "01d" -> R.drawable.ic_sun_filled
+            "01n" -> R.drawable.ic_moon_filled
+            "02d" -> R.drawable.ic_sun_cloud_filled
+            "02n" -> R.drawable.ic_moon_cloud_filled
+            "03d", "03n" -> R.drawable.ic_light_cloud
+            "04d", "04n" -> R.drawable.ic_clouds_filled
+            "09d", "09n" -> R.drawable.ic_rain_heavy_filled
+            "10d" -> R.drawable.ic_sun_rain_filled
+            "10n" -> R.drawable.ic_moon_rain_filled
+            "11d", "11n" -> R.drawable.ic_thunderstorm_filled
+            "13d", "13n" -> R.drawable.ic_snow_filled
+            "50d", "50n" -> R.drawable.ic_fog_filled
+            else -> R.drawable.ic_sun_cloud_filled
         }
     }
-    private fun generateRecommendations(weatherData: Weather?, forecastData: List<DisplayDayWeather>?): List<Recommendation> {
-        val recommendations = mutableListOf<Recommendation>()
-        if (weatherData == null) return emptyList()
 
+    private fun generateRecommendations(weatherData: Weather?, forecastData: List<DisplayDayWeather>?): List<Recommendation> {
+        // Логгирование локали здесь теперь менее важно, так как строки будут извлекаться в UI
+        // val appCtx = application.applicationContext
+        // val currentLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        //     appCtx.resources.configuration.locales[0]
+        // } else {
+        //     appCtx.resources.configuration.locale
+        // }
+        // Log.d(TAG, "generateRecommendations: Current locale check (ViewModel): $currentLocale")
+
+        val recommendations = mutableListOf<Recommendation>()
+        if (weatherData == null) {
+            return emptyList()
+        }
         val currentTemp = weatherData.main.temp
 
         // 1. Пейте воду
-        val isHot = currentTemp > 25.0 // TODO: Сделать порог настраиваемым или более умным
+        val isHot = currentTemp > 25.0
         recommendations.add(
             Recommendation(
                 id = "drink_water",
-                text = "Пейте больше воды", // TODO: Локализовать
+                textResId = if (isHot) R.string.rec_drink_water_active else R.string.rec_drink_water_default,
+                descriptionResId = if (isHot) R.string.rec_drink_water_desc_active else R.string.rec_drink_water_desc_default,
                 icon = Icons.Filled.LocalDrink,
                 isActive = isHot,
-                activeColor = Color(0xFF4FC3F7) // Голубой
+                activeColor = Color(0xFF4FC3F7)
             )
         )
 
-        // 2. Высокий УФ (Очень упрощенное условие)
+        // 2. Высокий УФ
         val weatherCondition = weatherData.weather.firstOrNull()
         val iconCode = weatherCondition?.icon
-
-        val isSunnyOrFewCloudsDay = when (iconCode) {
-            "01d", "02d" -> true // "01d" - ясно, "02d" - малооблачно (день)
-            else -> false
-        }
-
-        val isWarmEnoughForUvConcern = currentTemp > 15.0 // Порог температуры для УФ-опасений
+        val isSunnyOrFewCloudsDay = when (iconCode) { "01d", "02d" -> true else -> false }
+        val isWarmEnoughForUvConcern = currentTemp > 15.0
+        val isUvActive = isSunnyOrFewCloudsDay && isWarmEnoughForUvConcern
         recommendations.add(
             Recommendation(
                 id = "high_uv",
-                text = "Защититесь от солнца", // TODO: Локализовать
+                textResId = if (isUvActive) R.string.rec_uv_protection_active else R.string.rec_uv_protection_default,
+                descriptionResId = if (isUvActive) R.string.rec_uv_protection_desc_active else R.string.rec_uv_protection_desc_default,
                 icon = Icons.Filled.WbSunny,
-                isActive = isSunnyOrFewCloudsDay && isWarmEnoughForUvConcern,
-                activeColor = Color(0xFFFFD54F) // Желтый
+                isActive = isUvActive,
+                activeColor = Color(0xFFFFD54F)
             )
         )
 
         // 3. Шины / Гололед
-        val isColdForTires = currentTemp < 3.0 // TODO: Улучшить условие (учесть осадки)
+        val isColdForTires = currentTemp < 3.0
         recommendations.add(
             Recommendation(
                 id = "check_tires",
-                text = "Возможен гололед, осторожнее!", // TODO: Локализовать
+                textResId = if (isColdForTires) R.string.rec_tire_change_active else R.string.rec_tire_change_default,
+                descriptionResId = if (isColdForTires) R.string.rec_tire_change_desc_active else R.string.rec_tire_change_desc_default,
                 icon = Icons.Filled.DirectionsCar,
                 isActive = isColdForTires,
-                activeColor = Color(0xFF81D4FA) // Светло-голубой
+                activeColor = Color(0xFF81D4FA)
             )
         )
 
         // 4. Зонтик
         val isRainingNow = weatherData.weather.any { it.main.contains("Rain", ignoreCase = true) }
-
-        // ID ресурсов для иконок дождя из функции mapWeatherConditionToIcon
-        // Убедитесь, что эта функция возвращает правильные ID для этих кодов!
         val rainIconResId = mapWeatherConditionToIcon(null, "10d")
         val showerRainIconResId = mapWeatherConditionToIcon(null, "09d")
-
-        val willRainSoon = forecastData?.take(2)?.any { dailyWeather -> // Проверяем следующие 2 дня
+        val willRainSoon = forecastData?.take(2)?.any { dailyWeather ->
             dailyWeather.iconRes == rainIconResId || dailyWeather.iconRes == showerRainIconResId
         } ?: false
-
+        val isUmbrellaNeeded = isRainingNow || willRainSoon
         recommendations.add(
             Recommendation(
                 id = "take_umbrella",
-                text = "Возьмите зонт", // TODO: Локализовать
+                textResId = if (isUmbrellaNeeded) R.string.rec_umbrella_active else R.string.rec_umbrella_default,
+                descriptionResId = if (isUmbrellaNeeded) R.string.rec_umbrella_desc_active else R.string.rec_umbrella_desc_default,
                 icon = Icons.Filled.Umbrella,
-                isActive = isRainingNow || willRainSoon,
-                activeColor = Color(0xFFFFB74D) // Оранжевый
+                isActive = isUmbrellaNeeded,
+                activeColor = Color(0xFFFFB74D)
             )
         )
+
+        // --- НОВЫЕ РЕКОМЕНДАЦИИ (продолжите для всех) ---
+        // 5. Dress warmly
+        val needsWarmClothes = currentTemp < 10.0
+        recommendations.add(
+            Recommendation(
+                id = "dress_warmly",
+                textResId = if (needsWarmClothes) R.string.rec_dress_warmly_active else R.string.rec_dress_warmly_default,
+                descriptionResId = if (needsWarmClothes) R.string.rec_dress_warmly_desc_active else R.string.rec_dress_warmly_desc_default,
+                icon = Icons.Filled.Thermostat,
+                isActive = needsWarmClothes,
+                activeColor = Color(0xFFB0BEC5)
+            )
+        )
+
+        // 6. Limit outdoor activity
+        val isVeryHot = currentTemp > 35.0
+        val isVeryCold = currentTemp < -15.0
+        val isBadWeather = weatherData.weather.any { it.main.contains("Storm", ignoreCase = true) || it.main.contains("Snow", ignoreCase = true) && currentTemp < 0 }
+        val limitActivity = isVeryHot || isVeryCold || isBadWeather
+        recommendations.add(
+            Recommendation(
+                id = "limit_activity",
+                textResId = if (limitActivity) R.string.rec_limit_activity_active else R.string.rec_limit_activity_default,
+                descriptionResId = if (limitActivity) R.string.rec_limit_activity_desc_active else R.string.rec_limit_activity_desc_default,
+                icon = Icons.Filled.AccessibilityNew,
+                isActive = limitActivity,
+                activeColor = Color(0xFFEF5350)
+            )
+        )
+        // Добавьте остальные новые рекомендации (check_tires уже был, careful_roads, ventilate, moisturizer, light_clothes) по аналогии...
+        // Не забудьте для каждой добавить Log.d, чтобы видеть, какие строки извлекаются
+
         return recommendations
     }
 
@@ -460,8 +519,6 @@ class WeatherViewModel @Inject constructor(
             val previousLangCode = _uiState.value.currentLanguageCode
             val newLangCode = language.code
 
-            // Избегаем избыточной обработки, если язык не изменился
-            // Особый случай для AppLanguage.SYSTEM, если currentLanguageCode уже пуст (означает системный)
             if (language == AppLanguage.SYSTEM && previousLangCode.isEmpty()) {
                 Log.d(TAG, "Language selection skipped: already system language and no specific language was previously set.")
                 return@launch
@@ -472,34 +529,34 @@ class WeatherViewModel @Inject constructor(
             }
             Log.d(TAG, "Выбран язык: ${language.name}. Код: '$newLangCode'")
             userPreferencesManager.saveSelectedLanguage(language)
-            // UiState.currentLanguageCode обновится через коллектор currentLanguage.onEach
-            // Это также вызовет обновление apiLangForUpdate и cityForDisplay через последующие вызовы
 
             val apiLangForUpdate = newLangCode.ifEmpty { null }
 
-            _uiState.value.selectedCityObject?.let { city ->
-                Log.d(TAG, "Язык изменен, обновление данных для ${city.name}")
-                // Обновляем отображаемое имя города и поисковый запрос, если он совпадал с отображаемым именем
-                // Это изменение в UiState произойдет до перезагрузки погоды и до recreate
-                val newFormattedName = formatCityNameInternal(city, newLangCode)
-                val oldFormattedName = formatCityNameInternal(city, previousLangCode)
+            val cityToUpdate = _uiState.value.selectedCityObject
+            val cityForDisplayFromState = _uiState.value.cityForDisplay
+
+            if (cityToUpdate != null) {
+                Log.d(TAG, "onLanguageSelected: Язык изменен, обновление данных для ${cityToUpdate.name}")
+                val newFormattedName = formatCityNameInternal(cityToUpdate, newLangCode)
+                val oldFormattedName = formatCityNameInternal(cityToUpdate, previousLangCode)
                 _uiState.update {
                     it.copy(
                         cityForDisplay = newFormattedName,
                         searchQuery = if (it.searchQuery == oldFormattedName) newFormattedName else it.searchQuery
-                        // currentLanguageCode будет обновлен через flow от userPreferencesManager,
-                        // который коллектится в init {} и обновляет uiState
+                        // currentLanguageCode обновится через коллектор в init{}
                     )
                 }
-                fetchCurrentWeatherAndForecast(city, apiLangForUpdate)
-            } ?: run {
-                if (_uiState.value.selectedCityObject == null && _uiState.value.cityForDisplay.contains(DEFAULT_CITY_FALLBACK, ignoreCase = true)) {
-                    Log.d(TAG, "Язык изменен, город не выбран, обновление данных для города по умолчанию.")
-                    findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true, apiLangForUpdate)
-                }
+                fetchCurrentWeatherAndForecast(cityToUpdate, apiLangForUpdate)
+            } else if (cityForDisplayFromState.contains(DEFAULT_CITY_FALLBACK, ignoreCase = true) || cityForDisplayFromState.isEmpty()) {
+                Log.d(TAG, "onLanguageSelected: Язык изменен, город не выбран (или по умолчанию), обновление данных для города по умолчанию.")
+                findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true, apiLangForUpdate)
+            } else {
+                Log.d(TAG, "onLanguageSelected: Язык изменен, но город не выбран и не является городом по умолчанию. UI должен обновиться без перезагрузки погоды (только через currentLanguage.onEach).")
+                // В этом случае, если recommendations не были перегенерированы в currentLanguage.onEach (из-за отсутствия weather data),
+                // они могут остаться на старом языке. Однако, если weather data нет, то и рекомендаций быть не должно.
+                // Если же они есть, то currentLanguage.onEach должен был их обновить.
             }
 
-            // Установка локали приложения
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 try {
                     val localeListToSet = if (newLangCode.isEmpty()) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(newLangCode)
@@ -509,7 +566,6 @@ class WeatherViewModel @Inject constructor(
                     Log.e(TAG, "Ошибка установки локали приложения на API 33+: ${e.message}", e)
                 }
             }
-            // НЕЗАВИСИМО ОТ ВЕРСИИ ANDROID, вызываем recreate для теста
             _recreateActivityEvent.emit(Unit)
             Log.d(TAG, "Forced recreateActivityEvent emitted after language change.")
         }
@@ -524,7 +580,6 @@ class WeatherViewModel @Inject constructor(
             if (isInitialOrFallback) {
                 _uiState.update { it.copy(isLoadingWeather = true, isLoadingForecast = true, isInitialLoading = true) }
             }
-            // Язык для поиска города: если это начальная загрузка/смена языка, используем explicitApiLang, иначе текущий язык приложения
             val langForCitySearch = explicitApiLang ?: getApiLangCode()
             Log.d(TAG, "Внутренний поиск: Поиск города: '$cityName'. Язык API для поиска: '$langForCitySearch'")
 
@@ -533,7 +588,6 @@ class WeatherViewModel @Inject constructor(
                     weatherApi.searchCities(query = cityName, apiKey = apiKey, limit = 1, lang = langForCitySearch)
                 }
                 cities.firstOrNull()?.let { foundCity ->
-                    // Язык для отображения: используем текущий язык приложения (из _uiState) или explicitApiLang если он есть
                     val langForDisplay = _uiState.value.currentLanguageCode.ifEmpty { explicitApiLang ?: "" }
                     val formattedName = formatCityNameInternal(foundCity, langForDisplay)
                     Log.d(TAG, "Внутренний поиск: Город найден: ${foundCity.name}. Язык отображения: '$langForDisplay', Форматированное имя: '$formattedName'")
@@ -545,17 +599,16 @@ class WeatherViewModel @Inject constructor(
                             searchQuery = formattedName
                         )
                     }
-                    // Передаем explicitApiLang для единообразия языка при загрузке погоды
-                    fetchCurrentWeatherAndForecast(foundCity, explicitApiLang)
-                    if (isInitialOrFallback) { // Сохраняем город только если это начальная загрузка или загрузка по умолчанию
+                    fetchCurrentWeatherAndForecast(foundCity, explicitApiLang) // Это вызовет generateRecommendations в конце
+                    if (isInitialOrFallback) {
                         userPreferencesManager.saveLastSelectedCity(foundCity)
                     }
                 } ?: run {
                     Log.w(TAG, "Внутренний поиск: Город '$cityName' не найден через API.")
                     _uiState.update {
                         it.copy(
-                            cityForDisplay = if (it.cityForDisplay.isEmpty()) "$MSG_CITY_NOT_FOUND_WEATHER $cityName" else it.cityForDisplay,
-                            weatherErrorMessage = "$MSG_CITY_NOT_FOUND_WEATHER $cityName",
+                            cityForDisplay = if (it.cityForDisplay.isEmpty()) application.applicationContext.getString(R.string.city_not_found) else it.cityForDisplay,
+                            weatherErrorMessage = application.applicationContext.getString(R.string.city_not_found),
                             isLoadingWeather = false, isLoadingForecast = false, isInitialLoading = false
                         )
                     }
@@ -564,7 +617,7 @@ class WeatherViewModel @Inject constructor(
                 Log.e(TAG, "Внутренний поиск: Ошибка поиска/загрузки города '$cityName': ${e.message}", e)
                 _uiState.update {
                     it.copy(
-                        weatherErrorMessage = "$MSG_CITY_SEARCH_ERROR ${e.localizedMessage}",
+                        weatherErrorMessage = application.applicationContext.getString(R.string.error_loading_cities),
                         isLoadingWeather = false, isLoadingForecast = false, isInitialLoading = false
                     )
                 }

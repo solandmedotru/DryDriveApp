@@ -1,5 +1,6 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
+import androidx.compose.animation.core.copy
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -22,19 +23,27 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+// ... другие существующие импорты ...
 import androidx.compose.ui.unit.sp
 import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.feature_weather.ui.composables.DailyForecastPlaceholder
 import ru.devsoland.drydrive.feature_weather.ui.composables.DailyForecastRow
 import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationsDisplaySection
 import ru.devsoland.drydrive.feature_weather.ui.composables.WeatherDetails
+// НОВЫЙ ИМПОРТ:
+import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationInfoDialog
 import ru.devsoland.drydrive.ui.theme.CityBackgroundOverlay
 import java.util.Locale
 
 @Composable
-fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
+fun HomeScreenContent(
+    modifier: Modifier = Modifier,
+    uiState: WeatherUiState,
+    onEvent: (WeatherEvent) -> Unit // <--- ДОБАВЬТЕ ЭТОТ ПАРАМЕТР, ЕСЛИ ЕГО НЕТ
+) {
     val carImageResId = when (uiState.weather?.weather?.getOrNull(0)?.main?.lowercase(Locale.ROOT)) {
         "rain", "snow", "thunderstorm", "drizzle", "mist", "fog" -> R.drawable.car_dirty
         else -> R.drawable.car_clean
@@ -51,16 +60,17 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
     Box(modifier = modifier
         .fillMaxSize()
         .background(MaterialTheme.colorScheme.background)) {
+        // Основной контент экрана в Column для скролла
         Column(modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()) // Добавил вертикальный скролл для всего контента
+            .verticalScroll(rememberScrollState())
         ) {
             // Секция с фоном города и текущей погодой/машиной
             Box(modifier = Modifier
                 .fillMaxWidth()
-                // .weight(1f) // weight не очень хорошо работает с verticalScroll, лучше задавать высоты явно или использовать minHeight
-                .aspectRatio(1f / 1.1f) // Примерное соотношение для этой секции, подберите по вкусу
+                .aspectRatio(1f / 1.1f)
             ) {
+                // ... ваш код для фона и информации о погоде ...
                 Image(
                     painter = painterResource(id = R.drawable.city_background),
                     contentDescription = stringResource(R.string.city_background_description),
@@ -92,7 +102,11 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
                         )
                         uiState.weather != null -> {
                             WeatherDetails(weather = uiState.weather)
-                            Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_medium)))
+                            Spacer(modifier = Modifier.height(
+                                dimensionResource(
+                                    R.dimen.spacing_medium
+                                )
+                            ))
                             if (washRecommendation.isNotBlank()) {
                                 Text(
                                     text = washRecommendation,
@@ -105,7 +119,7 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
                         else -> Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(150.dp), // Задаем высоту, чтобы Spacer.weight работал корректно
+                                .height(150.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -116,7 +130,7 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.weight(1f)) // Занимает оставшееся место, чтобы машина была внизу
+                    Spacer(modifier = Modifier.weight(1f))
                     if (uiState.weather != null) {
                         Image(
                             painter = painterResource(id = carImageResId),
@@ -138,7 +152,12 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
                 .padding(horizontal = dimensionResource(R.dimen.spacing_xlarge))
                 .padding(top = dimensionResource(R.dimen.spacing_large))) {
                 // ИСПРАВЛЕННЫЙ ВЫЗОВ:
-                RecommendationsDisplaySection(recommendations = uiState.recommendations)
+                // Убедитесь, что RecommendationsDisplaySection ПЕРЕДАЕТ onEvent дальше,
+                // если RecommendationItem находится внутри него
+                RecommendationsDisplaySection(
+                    recommendations = uiState.recommendations,
+                    onEvent = onEvent // <--- ПЕРЕДАЕМ onEvent СЮДА
+                )
             }
 
             // Секция прогноза
@@ -149,14 +168,15 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
                     top = dimensionResource(R.dimen.spacing_large),
                     bottom = dimensionResource(R.dimen.spacing_large)
                 )) {
+                // ... ваш код для секции прогноза ...
                 when {
                     uiState.isLoadingForecast && uiState.dailyForecasts.isEmpty() -> Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp), // Задаем высоту для плейсхолдера
+                            .height(120.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        DailyForecastPlaceholder() // Можно оставить или убрать, если CircularProgressIndicator достаточно
+                        DailyForecastPlaceholder()
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
                     }
                     uiState.forecastErrorMessage != null && uiState.dailyForecasts.isEmpty() -> Box(
@@ -174,11 +194,21 @@ fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
                     uiState.dailyForecasts.isNotEmpty() -> {
                         DailyForecastRow(forecasts = uiState.dailyForecasts)
                     }
-                    else -> { // Если нет ни загрузки, ни ошибки, ни данных - показываем плейсхолдер
+                    else -> {
                         DailyForecastPlaceholder()
                     }
                 }
             }
+        } // Конец Column для скролла
+
+        // ДОБАВЬТЕ ЭТОТ БЛОК ДЛЯ ОТОБРАЖЕНИЯ ДИАЛОГА ВНУТРИ ОСНОВНОГО BOX:
+        if (uiState.showRecommendationDialog) {
+            RecommendationInfoDialog(
+                titleResId = uiState.recommendationDialogTitleResId,
+                descriptionResId = uiState.recommendationDialogDescriptionResId,
+                onDismiss = { onEvent(WeatherEvent.DismissRecommendationDialog) }
+            )
         }
-    }
+    } // Конец корневого Box
 }
+

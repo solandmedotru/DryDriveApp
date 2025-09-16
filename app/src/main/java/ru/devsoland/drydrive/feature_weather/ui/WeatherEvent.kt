@@ -9,7 +9,12 @@ sealed class WeatherEvent {
     object DismissCitySearchDropDown : WeatherEvent()
 
     // События погоды
-    object RefreshWeatherClicked : WeatherEvent()object ClearWeatherErrorMessage : WeatherEvent() // Если нужно будет очищать ошибку из UI
+    object RefreshWeatherClicked : WeatherEvent()
+    object ClearWeatherErrorMessage : WeatherEvent() // Если нужно будет очищать ошибку из UI
+
+    // НОВЫЕ События для диалога рекомендаций
+    data class RecommendationClicked(val recommendation: Recommendation) : WeatherEvent() // Добавлено
+    object DismissRecommendationDialog : WeatherEvent() // Добавлено
 
     // Можно добавить и другие события по мере необходимости
 }

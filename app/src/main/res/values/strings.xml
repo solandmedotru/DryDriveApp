@@ -6,20 +6,28 @@
     <string name="clear_search_description">Очистить</string>
     <string name="location_description">Местоположение</string>
     <string name="select_city_prompt">Выберите город</string>
-    <string name="select_city_action">Выбрать город</string>
-    <string name="city_not_found">Город не найден</string>
+    <string name="select_city_action">Выбрать город</string><string name="city_not_found">Город не найден. Проверьте название.</string>
     <string name="action_ok">ОК</string>
     <string name="action_search">Поиск</string>
     <string name="action_menu">Меню</string>
     <string name="drawer_menu_todo">Меню (TODO)</string>
 
+    <!-- Сообщения об ошибках и состояниях из ViewModel -->
+    <string name="error_loading_cities">Не удалось загрузить список городов.</string>
+    <string name="error_loading_weather">Не удалось загрузить данные о погоде.</string>
+    <string name="error_unknown">Произошла неизвестная ошибка.</string>
+    <string name="error_location_unavailable">Местоположение недоступно. Проверьте разрешения или включите службы геолокации.</string>
+    <string name="error_network_unavailable">Сеть недоступна. Проверьте интернет-соединение.</string>
+    <string name="status_getting_location_weather">Получение погоды для вашего местоположения…</string>
+    <string name="label_current_location">Текущее местоположение</string>
+
     <!-- Car Wash Recommendations -->
     <string name="wash_not_recommended">Мойка не рекомендуется.</string>
-    <string name="wash_possible_limited_visibility">Можно помыть, но видимость ограничена.</string>
+    <string name="wash_possible_limited_visibility">Мойка возможна, но видимость ограничена.</string>
     <string name="wash_great_day">Отличный день для мойки!</string>
-    <string name="wash_good_weather_but_cool">Погода хорошая, но прохладно для мойки.</string>
-    <string name="car_dirty_description">Грязный автомобиль</string>
-    <string name="car_clean_description">Чистый автомобиль</string>
+    <string name="wash_good_weather_but_cool">Погода хорошая, но для мойки прохладно.</string>
+    <string name="car_dirty_description">Грязная машина</string>
+    <string name="car_clean_description">Чистая машина</string>
     <string name="city_background_description">Фон города</string>
 
     <!-- Weather Details -->
@@ -27,39 +35,75 @@
 
     <!-- Forecast -->
     <string name="forecast_now">Сейчас</string>
-    <string name="forecast_icon_description_template">%s погода</string> <!-- Для ForecastDayCard, если нужно осмысленное описание -->
+    <string name="forecast_icon_description_template">Погода: %s</string>
     <string name="forecast_unavailable">Прогноз недоступен</string>
 
     <!-- Recommendations -->
-    <string name="rec_drink_water_default">Пейте воду</string>
+    <string name="rec_drink_water_default">Пейте воду!</string>
     <string name="rec_drink_water_active">Пейте воду!</string>
-    <string name="rec_drink_water_desc_default">Рекомендация: пить воду</string>
-    <string name="rec_drink_water_desc_active">Активная рекомендация: пить воду</string>
+    <string name="rec_drink_water_desc_default">Рекомендация: Пейте воду!</string>
+    <string name="rec_drink_water_desc_active">Активная рекомендация: Пейте воду!</string>
 
     <string name="rec_uv_protection_default">Высокий УФ</string>
-    <string name="rec_uv_protection_active">Защита от УФ!</string>
-    <string name="rec_uv_protection_desc_default">Рекомендация: УФ защита</string>
-    <string name="rec_uv_protection_desc_active">Активная рекомендация: УФ защита</string>
+    <string name="rec_uv_protection_active">УФ Защита!</string>
+    <string name="rec_uv_protection_desc_default">Рекомендация: защита от УФ</string>
+    <string name="rec_uv_protection_desc_active">Активная рекомендация: защита от УФ</string>
 
-    <string name="rec_tire_change_default">Смена колес</string>
+    <string name="rec_tire_change_default">Смена шин</string>
     <string name="rec_tire_change_active">Заморозки!</string>
-    <string name="rec_tire_change_desc_default">Рекомендация: смена колес</string>
+    <string name="rec_tire_change_desc_default">Рекомендация: смена шин</string>
     <string name="rec_tire_change_desc_active">Активная рекомендация: заморозки</string>
 
     <string name="rec_umbrella_default">Возьмите зонт</string>
     <string name="rec_umbrella_active">Нужен зонт!</string>
-    <string name="rec_umbrella_desc_default">Рекомендация: взять зонт</string>
-    <string name="rec_umbrella_desc_active">Активная рекомендация: взять зонт</string>
+    <string name="rec_umbrella_desc_default">Рекомендация: возьмите зонт</string>
+    <string name="rec_umbrella_desc_active">Активная рекомендация: возьмите зонт</string>
+
+    <!-- НОВЫЕ КОРОТКИЕ Рекомендации -->
+    <string name="rec_dress_warmly_default">Теплее</string>
+    <string name="rec_dress_warmly_active">Теплее!</string>
+    <string name="rec_dress_warmly_desc_default">Рекомендация: Одевайтесь теплее.</string>
+    <string name="rec_dress_warmly_desc_active">Активная рекомендация: Одевайтесь теплее.</string>
+
+    <string name="rec_limit_activity_default">Меньше на улицу</string>
+    <string name="rec_limit_activity_active">Меньше на улицу!</string>
+    <string name="rec_limit_activity_desc_default">Рекомендация: Ограничьте активность на открытом воздухе.</string>
+    <string name="rec_limit_activity_desc_active">Активная рекомендация: Ограничьте активность на открытом воздухе.</string>
+
+    <string name="rec_check_tires_default">Шины</string>
+    <string name="rec_check_tires_active">Шины!</string>
+    <string name="rec_check_tires_desc_default">Рекомендация: Проверьте давление в шинах.</string>
+    <string name="rec_check_tires_desc_active">Активная рекомендация: Проверьте давление в шинах.</string>
+
+    <string name="rec_careful_roads_default">На дорогах</string>
+    <string name="rec_careful_roads_active">На дорогах!</string>
+    <string name="rec_careful_roads_desc_default">Рекомендация: Будьте осторожны на дорогах.</string>
+    <string name="rec_careful_roads_desc_active">Активная рекомендация: Будьте осторожны на дорогах.</string>
+
+    <string name="rec_ventilate_default">Проветри</string>
+    <string name="rec_ventilate_active">Проветри!</string>
+    <string name="rec_ventilate_desc_default">Рекомендация: Проветривайте помещение.</string>
+    <string name="rec_ventilate_desc_active">Активная рекомендация: Проветривайте помещение.</string>
+
+    <string name="rec_moisturizer_default">Увлажняй</string>
+    <string name="rec_moisturizer_active">Увлажняй!</string>
+    <string name="rec_moisturizer_desc_default">Рекомендация: Используйте увлажняющий крем.</string>
+    <string name="rec_moisturizer_desc_active">Активная рекомендация: Используйте увлажняющий крем.</string>
+
+    <string name="rec_light_clothes_default">Легкая одежда</string>
+    <string name="rec_light_clothes_active">Легкая одежда!</string>
+    <string name="rec_light_clothes_desc_default">Рекомендация: Надевайте легкую и дышащую одежду.</string>
+    <string name="rec_light_clothes_desc_active">Активная рекомендация: Надевайте легкую и дышащую одежду.</string>
 
     <!-- Bottom Navigation -->
     <string name="nav_home">Главная</string>
     <string name="nav_map">Карта</string>
     <string name="nav_settings">Настройки</string>
 
+    <!-- Settings -->
     <string name="language_russian">Русский</string>
-    <string name="language_english">English</string>
+    <string name="language_english">Английский</string>
     <string name="settings_language_title">Язык приложения</string>
     <string name="map_screen_placeholder">Карта (в разработке)</string>
     <string name="language_system">Системный</string>
-
 </resources>

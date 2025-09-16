@@ -1,5 +1,7 @@
 package ru.devsoland.drydrive.feature_weather.ui.composables
 
+import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -9,23 +11,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.WbSunny // Пример для Preview
+import androidx.compose.ui.graphics.Color // Пример для Preview
 import ru.devsoland.drydrive.R
-import ru.devsoland.drydrive.feature_weather.ui.Recommendation // ИМПОРТИРУЙТЕ ВАШ DATA CLASS ИЗ ViewModel
-
-// Старый WeatherRecommendationSection и RecommendationChip можно удалить или закомментировать,
-// если вы полностью переходите на новую систему.
+import ru.devsoland.drydrive.feature_weather.ui.Recommendation
+import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent
 
 @Composable
-fun RecommendationsDisplaySection( // Новое имя, чтобы не путать
+fun RecommendationsDisplaySection(
     recommendations: List<Recommendation>,
+    onEvent: (WeatherEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (recommendations.isNotEmpty()) {
-        // Можно использовать LazyRow для горизонтальной прокрутки, если их много,
-        // или FlowRow для переноса на следующую строку.
-        // Для простоты пока оставим Row, как у вас было, но лучше FlowRow.
         Row(
             modifier = modifier
                 .fillMaxWidth()
@@ -33,61 +39,110 @@ fun RecommendationsDisplaySection( // Новое имя, чтобы не пут�
             horizontalArrangement = Arrangement.SpaceAround
         ) {
             recommendations.forEach { recommendation ->
-                DynamicRecommendationChip(recommendation = recommendation)
+                DynamicRecommendationChip(
+                    recommendation = recommendation,
+                    onEvent = onEvent,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
 }
 
 @Composable
-fun DynamicRecommendationChip( // Новое имя
+fun DynamicRecommendationChip(
     recommendation: Recommendation,
+    onEvent: (WeatherEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentAlpha = if (recommendation.isActive) recommendation.activeAlpha else recommendation.inactiveAlpha
-    val iconToShow = recommendation.icon // Иконка уже в Recommendation data class
-    val textToShow = recommendation.text // Текст уже в Recommendation data class
-
-    // Цвет для иконки и текста
-    val currentTintColor = if (recommendation.isActive) {
+    val currentIconColor = if (recommendation.isActive) {
         recommendation.activeColor
     } else {
-        // Для неактивных: использовать их activeColor, но с низкой альфой,
-        // или приглушенный цвет темы. Выберем первый вариант для цветных, но бледных.
-        recommendation.activeColor
-        // Альтернатива для неактивных (серые):
-        // MaterialTheme.colorScheme.onSurfaceVariant
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
     }
-
     val currentTextColor = if (recommendation.isActive) {
-        recommendation.activeColor // Текст тоже может быть в цвет иконки
-        // или MaterialTheme.colorScheme.onSurface
+        recommendation.activeColor
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant // Приглушенный цвет для неактивного текста
+        MaterialTheme.colorScheme.onSurfaceVariant
     }
+
+    // Получаем строки для contentDescription заранее
+    val recommendationShortText = stringResource(id = recommendation.textResId)
+    val recommendationFullDescription = stringResource(id = recommendation.descriptionResId)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .width(IntrinsicSize.Min) // Для автоматической ширины
-            .alpha(currentAlpha)      // Применяем общую прозрачность здесь
-            .padding(horizontal = dimensionResource(R.dimen.spacing_small)) // Небольшой отступ между чипами
+            .defaultMinSize(minHeight = dimensionResource(id = R.dimen.chip_min_height))
+            .alpha(currentAlpha)
+            .clickable(
+                onClickLabel = stringResource(id = R.string.select_city_action),
+                role = Role.Button,
+                onClick = {
+                    Log.d("DynamicChip", "Clicked: ${recommendation.id}, TextResId: ${recommendation.textResId}")
+                    onEvent(WeatherEvent.RecommendationClicked(recommendation))
+                }
+            )
+            .padding(dimensionResource(id = R.dimen.spacing_small))
+            .semantics {
+                contentDescription = "$recommendationShortText. $recommendationFullDescription" // <--- ИСПРАВЛЕНО ЗДЕСЬ
+            }
     ) {
         Icon(
-            imageVector = iconToShow,
-            contentDescription = textToShow, // Используем текст как описание для простоты
-            tint = currentTintColor, // Вот где используется ваш кастомный цвет
-            modifier = Modifier.size(dimensionResource(R.dimen.icon_size_large))
+            imageVector = recommendation.icon,
+            contentDescription = null, // Описание уже на родительском Column
+            tint = currentIconColor,
+            modifier = Modifier.size(dimensionResource(id = R.dimen.icon_size_large))
         )
-        Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_small)))
+        Spacer(modifier = Modifier.height(dimensionResource(id = R.dimen.spacing_extra_small)))
         Text(
-            text = textToShow,
-            color = currentTextColor, // Цвет текста
-            // fontSize = dimensionResource(R.dimen.font_size_small_caption).value.sp,
-            style = MaterialTheme.typography.labelSmall, // Используем стиль темы
+            // Используем ту же переменную, что и для semantics, чтобы избежать двойного вызова stringResource
+            text = recommendationShortText,
+            color = currentTextColor,
+            style = MaterialTheme.typography.labelSmall,
             textAlign = TextAlign.Center,
             fontWeight = if (recommendation.isActive) FontWeight.Medium else FontWeight.Normal,
-            maxLines = 2 // Ограничим высоту текста, если он длинный
+            maxLines = 2
         )
     }
 }
+
+
+@Preview(showBackground = true, name = "Active Dynamic Chip")
+@Composable
+fun DynamicRecommendationChipActivePreview() {
+    MaterialTheme {
+        DynamicRecommendationChip(
+            recommendation = Recommendation(
+                id = "preview_active_chip",
+                textResId = R.string.rec_drink_water_active,
+                descriptionResId = R.string.rec_drink_water_desc_active,
+                icon = Icons.Filled.WbSunny,
+                isActive = true,
+                activeColor = Color.Blue
+            ),
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Inactive Dynamic Chip")
+@Composable
+fun DynamicRecommendationChipInactivePreview() {
+    MaterialTheme {
+        DynamicRecommendationChip(
+            recommendation = Recommendation(
+                id = "preview_inactive_chip",
+                textResId = R.string.rec_umbrella_default,
+                descriptionResId = R.string.rec_umbrella_desc_default,
+                icon = Icons.Filled.WbSunny,
+                isActive = false,
+                activeColor = Color.Gray
+            ),
+            onEvent = {}
+        )
+    }
+}
+

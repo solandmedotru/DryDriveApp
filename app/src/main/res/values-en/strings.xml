@@ -4,14 +4,23 @@
     <!-- DryDriveScreen & TopAppBar -->
     <string name="search_city_placeholder">Search city...</string>
     <string name="clear_search_description">Clear</string>
-    <string name="location_description">Location</string>
+    <string name="location_description">Location</string> <!-- For current location button -->
     <string name="select_city_prompt">Select city</string>
     <string name="select_city_action">Select city</string>
-    <string name="city_not_found">City not found</string>
+    <string name="city_not_found">City not found. Please check the name.</string> <!-- Обновлено для большей ясности -->
     <string name="action_ok">OK</string>
     <string name="action_search">Search</string>
     <string name="action_menu">Menu</string>
     <string name="drawer_menu_todo">Menu (TODO)</string>
+
+    <!-- Error Messages & Statuses from ViewModel -->
+    <string name="error_loading_cities">Failed to load city list.</string>
+    <string name="error_loading_weather">Failed to load weather data.</string>
+    <string name="error_unknown">An unknown error occurred.</string>
+    <string name="error_location_unavailable">Location unavailable. Check permissions or enable location services.</string>
+    <string name="error_network_unavailable">Network unavailable. Check internet connection.</string>
+    <string name="status_getting_location_weather">Getting weather for your location…</string>
+    <string name="label_current_location">Current Location</string>
 
     <!-- Car Wash Recommendations -->
     <string name="wash_not_recommended">Washing not recommended.</string>
@@ -51,14 +60,51 @@
     <string name="rec_umbrella_desc_default">Recommendation: take an umbrella</string>
     <string name="rec_umbrella_desc_active">Active recommendation: take an umbrella</string>
 
+    <!-- NEW SHORT Recommendations -->
+    <string name="rec_dress_warmly_default">Dress warm</string>
+    <string name="rec_dress_warmly_active">Dress warm!</string>
+    <string name="rec_dress_warmly_desc_default">Recommendation: Dress warmly.</string>
+    <string name="rec_dress_warmly_desc_active">Active recommendation: Dress warmly.</string>
+
+    <string name="rec_limit_activity_default">Limit activity</string>
+    <string name="rec_limit_activity_active">Limit activity!</string>
+    <string name="rec_limit_activity_desc_default">Recommendation: Limit outdoor activity.</string>
+    <string name="rec_limit_activity_desc_active">Active recommendation: Limit outdoor activity.</string>
+
+    <string name="rec_check_tires_default">Check tires</string>
+    <string name="rec_check_tires_active">Check tires!</string>
+    <string name="rec_check_tires_desc_default">Recommendation: Check tire pressure.</string>
+    <string name="rec_check_tires_desc_active">Active recommendation: Check tire pressure.</string>
+
+    <string name="rec_careful_roads_default">Road care</string>
+    <string name="rec_careful_roads_active">Road care!</string>
+    <string name="rec_careful_roads_desc_default">Recommendation: Be careful on the roads.</string>
+    <string name="rec_careful_roads_desc_active">Active recommendation: Be careful on the roads.</string>
+
+    <string name="rec_ventilate_default">Ventilate</string>
+    <string name="rec_ventilate_active">Ventilate!</string>
+    <string name="rec_ventilate_desc_default">Recommendation: Ventilate the room.</string>
+    <string name="rec_ventilate_desc_active">Active recommendation: Ventilate the room.</string>
+
+    <string name="rec_moisturizer_default">Moisturize</string>
+    <string name="rec_moisturizer_active">Moisturize!</string>
+    <string name="rec_moisturizer_desc_default">Recommendation: Use moisturizer.</string>
+    <string name="rec_moisturizer_desc_active">Active recommendation: Use moisturizer.</string>
+
+    <string name="rec_light_clothes_default">Light clothes</string>
+    <string name="rec_light_clothes_active">Light clothes!</string>
+    <string name="rec_light_clothes_desc_default">Recommendation: Wear light and breathable clothes.</string>
+    <string name="rec_light_clothes_desc_active">Active recommendation: Wear light and breathable clothes.</string>
+
     <!-- Bottom Navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_map">Map</string>
     <string name="nav_settings">Settings</string>
 
+    <!-- Settings -->
     <string name="language_russian">Russian</string>
     <string name="language_english">English</string>
     <string name="settings_language_title">Application Language</string>
     <string name="map_screen_placeholder">Map (under development)</string>
-    <string name="language_system">System</string> <!-- Changed from "English" to "System" for clarity if this is meant for system default -->
+    <string name="language_system">System</string>
 </resources>

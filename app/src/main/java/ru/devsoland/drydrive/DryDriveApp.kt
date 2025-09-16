@@ -97,12 +97,13 @@ fun DryDriveApp( viewModel: WeatherViewModel) {
                 when (selectedItemIndex) {
                     0 -> HomeScreenContent(
                         modifier = Modifier.padding(paddingValues),
-                        uiState = uiState
+                        uiState = uiState,
+                        onEvent = viewModel::onEvent
                     )
                     1 -> MapScreenPlaceholder(modifier = Modifier.padding(paddingValues))
                     2 -> SettingsScreen(
                         modifier = Modifier.padding(paddingValues),
-                        viewModel = viewModel
+                        viewModel = viewModel // SettingsScreen уже получает viewModel
                     )
                 }
             }
