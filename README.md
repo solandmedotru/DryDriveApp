@@ -69,9 +69,7 @@
 *   **`minSdkVersion`**: `24`
 *   **`compileSdkVersion` / `targetSdkVersion`**: `36`
 
-## 🚀 Начало работы
-
-## Contributing
+## 🚀 Contributing
 
 Contributions are always welcome!
 Follow the "fork-and-pull" Git workflow.
