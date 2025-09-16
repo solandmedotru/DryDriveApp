@@ -1,6 +1,6 @@
 package ru.devsoland.drydrive.common.util
 
-import ru.devsoland.drydrive.data.City
+import ru.devsoland.drydrive.data.api.model.City
 
 fun formatCityName(city: City, currentAppLanguageCode: String): String {
     val displayName = when {

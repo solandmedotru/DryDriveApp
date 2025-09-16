@@ -1,6 +1,6 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
-import ru.devsoland.drydrive.data.City
+import ru.devsoland.drydrive.data.api.model.City
 
 sealed class WeatherEvent {
     // События поиска городов

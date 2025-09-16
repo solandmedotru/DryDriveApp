@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp // Оставляем для специфичных отступов, если не вынесены в AppDimens
 import androidx.compose.ui.unit.sp // Оставляем для TextStyle, если размеры шрифтов не все вынесены в AppDimens
 import ru.devsoland.drydrive.R
-import ru.devsoland.drydrive.data.Weather
+import ru.devsoland.drydrive.data.api.model.Weather
 // import ru.devsoland.drydrive.ui.theme.TextOnDarkBackground // УДАЛЯЕМ ИМПОРТ КАСТОМНОГО ЦВЕТА
 // import ru.devsoland.drydrive.ui.theme.AppDimens // Если у вас есть такой файл для размеров
 import java.util.Locale

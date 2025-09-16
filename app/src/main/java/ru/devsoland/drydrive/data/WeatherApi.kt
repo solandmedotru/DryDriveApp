@@ -6,12 +6,15 @@ import okhttp3.MediaType.Companion.toMediaType
 import retrofit2.Retrofit
 import retrofit2.http.GET
 import retrofit2.http.Query
+import ru.devsoland.drydrive.data.api.model.City
+import ru.devsoland.drydrive.data.api.model.ForecastResponse
+import ru.devsoland.drydrive.data.api.model.Weather
 
 // Убедитесь, что импорты для Weather, City, ForecastResponse корректны,
 // если они находятся в этом же пакете, явные импорты не нужны.
-// import ru.devsoland.drydrive.data.Weather
-// import ru.devsoland.drydrive.data.City
-// import ru.devsoland.drydrive.data.ForecastResponse
+// import ru.devsoland.drydrive.data.api.model.Weather
+// import ru.devsoland.drydrive.data.api.model.City
+// import ru.devsoland.drydrive.data.api.model.ForecastResponse
 
 interface WeatherApi {
     @GET("data/2.5/weather")

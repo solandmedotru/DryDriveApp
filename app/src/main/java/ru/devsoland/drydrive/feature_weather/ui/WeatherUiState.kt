@@ -1,7 +1,7 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
-import ru.devsoland.drydrive.data.City
-import ru.devsoland.drydrive.data.Weather
+import ru.devsoland.drydrive.data.api.model.City
+import ru.devsoland.drydrive.data.api.model.Weather
 import ru.devsoland.drydrive.data.preferences.AppLanguage
 
 data class WeatherUiState(

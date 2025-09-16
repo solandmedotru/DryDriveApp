@@ -24,10 +24,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import ru.devsoland.drydrive.data.City
-import ru.devsoland.drydrive.data.ForecastListItem
-import ru.devsoland.drydrive.data.ForecastResponse
-import ru.devsoland.drydrive.data.Weather
+import ru.devsoland.drydrive.data.api.model.City
+import ru.devsoland.drydrive.data.api.model.ForecastListItem
+import ru.devsoland.drydrive.data.api.model.ForecastResponse
+import ru.devsoland.drydrive.data.api.model.Weather
 import ru.devsoland.drydrive.data.WeatherApi
 import ru.devsoland.drydrive.data.preferences.AppLanguage
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager

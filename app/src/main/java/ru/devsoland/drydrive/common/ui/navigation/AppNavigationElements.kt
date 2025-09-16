@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.common.util.formatCityName
-import ru.devsoland.drydrive.data.City
+import ru.devsoland.drydrive.data.api.model.City
 import ru.devsoland.drydrive.feature_weather.ui.WeatherUiState
 import ru.devsoland.drydrive.ui.theme.SearchFieldBorderFocused
 import ru.devsoland.drydrive.ui.theme.SearchFieldBorderUnfocused
