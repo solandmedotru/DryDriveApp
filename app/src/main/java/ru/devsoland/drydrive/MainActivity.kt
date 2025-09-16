@@ -52,6 +52,9 @@ import ru.devsoland.drydrive.data.City
 import ru.devsoland.drydrive.data.preferences.AppLanguage
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
 import ru.devsoland.drydrive.di.UserPreferencesEntryPoint
+import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent
+import ru.devsoland.drydrive.feature_weather.ui.WeatherUiState
+import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel
 import ru.devsoland.drydrive.ui.composables.DailyForecastPlaceholder
 import ru.devsoland.drydrive.ui.composables.DailyForecastRow
 import ru.devsoland.drydrive.ui.composables.RecommendationsDisplaySection // ИСПРАВЛЕННЫЙ ИМПОРТ
@@ -85,7 +88,7 @@ fun formatCityName(city: City, currentAppLanguageCode: String): String {
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val dryDriveViewModel: DryDriveViewModel by viewModels()
+    private val weatherViewModel: WeatherViewModel by viewModels()
 
     override fun attachBaseContext(newBase: Context) {
         Log.d("MainActivityLifecycle", "attachBaseContext CALLED. Initial base context locale: ${newBase.resources.configuration.locale}")
@@ -142,7 +145,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         lifecycleScope.launch {
-            dryDriveViewModel.recreateActivityEvent.collect {
+            weatherViewModel.recreateActivityEvent.collect {
                 Log.d("MainActivityLifecycle", "recreateActivityEvent received, calling recreate()")
                 this@MainActivity.recreate()
             }
@@ -154,7 +157,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    DryDriveApp(viewModel = dryDriveViewModel)
+                    DryDriveApp(viewModel = weatherViewModel)
                 }
             }
         }
@@ -204,7 +207,7 @@ fun Context.setAppLocale(languageCode: String): Context {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DryDriveApp( viewModel: DryDriveViewModel ) {
+fun DryDriveApp( viewModel: WeatherViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -243,12 +246,12 @@ fun DryDriveApp( viewModel: DryDriveViewModel ) {
                     DryDriveTopAppBar(
                         uiState = uiState,
                         onQueryChange = { query ->
-                            viewModel.onEvent(DryDriveEvent.SearchQueryChanged(query))
+                            viewModel.onEvent(WeatherEvent.SearchQueryChanged(query))
                         },
                         onCitySelected = { city, formattedName ->
-                            viewModel.onEvent(DryDriveEvent.CitySelectedFromSearch(city,formattedName))
+                            viewModel.onEvent(WeatherEvent.CitySelectedFromSearch(city,formattedName))
                         },
-                        onDismissSearch = { viewModel.onEvent(DryDriveEvent.DismissCitySearchDropDown) },
+                        onDismissSearch = { viewModel.onEvent(WeatherEvent.DismissCitySearchDropDown) },
                         onMenuClick = { scope.launch { drawerState.open() } }
                     )
                 },
@@ -278,7 +281,7 @@ fun DryDriveApp( viewModel: DryDriveViewModel ) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DryDriveTopAppBar(
-    uiState: DryDriveUiState,
+    uiState: WeatherUiState,
     onQueryChange: (String) -> Unit,
     onCitySelected: (City, String) -> Unit,
     onDismissSearch: () -> Unit,
@@ -420,7 +423,7 @@ fun DryDriveBottomNavigationBar(
 }
 
 @Composable
-fun HomeScreenContent(modifier: Modifier = Modifier, uiState: DryDriveUiState) {
+fun HomeScreenContent(modifier: Modifier = Modifier, uiState: WeatherUiState) {
     val carImageResId = when (uiState.weather?.weather?.getOrNull(0)?.main?.lowercase(Locale.ROOT)) {
         "rain", "snow", "thunderstorm", "drizzle", "mist", "fog" -> R.drawable.car_dirty
         else -> R.drawable.car_clean
@@ -584,7 +587,7 @@ fun DryDriveAppPreview() {
         Surface(color = MaterialTheme.colorScheme.background) {
             // Для превью можно создать фейковый ViewModel или передать null/пустой uiState, если ваш UI это обрабатывает
             // Либо используйте hiltViewModel() для превью, если настроено.
-            val previewViewModel: DryDriveViewModel = viewModel()
+            val previewViewModel: WeatherViewModel = viewModel()
             DryDriveApp(viewModel = previewViewModel)
         }
     }

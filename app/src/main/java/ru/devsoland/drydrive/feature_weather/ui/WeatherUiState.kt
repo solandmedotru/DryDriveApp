@@ -1,0 +1,24 @@
+package ru.devsoland.drydrive.feature_weather.ui
+
+import ru.devsoland.drydrive.data.City
+import ru.devsoland.drydrive.data.Weather
+import ru.devsoland.drydrive.data.preferences.AppLanguage
+
+data class WeatherUiState(
+    val weather: Weather? = null,
+    val isLoadingWeather: Boolean = false,
+    val weatherErrorMessage: String? = null,
+    val searchQuery: String = "",
+    val citySearchResults: List<City> = emptyList(),
+    val isLoadingCities: Boolean = false,
+    val citySearchErrorMessage: String? = null,
+    val isSearchDropDownExpanded: Boolean = false,
+    val cityForDisplay: String = "",
+    val selectedCityObject: City? = null,
+    val dailyForecasts: List<DisplayDayWeather> = emptyList(),
+    val isLoadingForecast: Boolean = false,
+    val forecastErrorMessage: String? = null,
+    val currentLanguageCode: String = AppLanguage.SYSTEM.code,
+    val isInitialLoading: Boolean = true,
+    val recommendations: List<Recommendation> = emptyList()
+)

@@ -19,7 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import ru.devsoland.drydrive.DisplayDayWeather
+import ru.devsoland.drydrive.feature_weather.ui.DisplayDayWeather
 // import androidx.compose.ui.unit.dp // Можно удалить, если все dp через dimensionResource
 import ru.devsoland.drydrive.R
 // Удаляем импорты кастомных цветов

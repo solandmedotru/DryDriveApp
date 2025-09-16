@@ -1,4 +1,4 @@
-package ru.devsoland.drydrive
+package ru.devsoland.drydrive.feature_weather.ui
 
 import android.os.Build
 import android.util.Log
@@ -43,6 +43,9 @@ import androidx.compose.material.icons.filled.DirectionsCar // Для шин
 import androidx.compose.material.icons.filled.LocalDrink // Для воды
 import androidx.compose.material.icons.filled.Umbrella // Для зонта
 import androidx.compose.material.icons.filled.WbSunny // Для УФ и общей солнечной погоды
+import ru.devsoland.drydrive.BuildConfig
+import ru.devsoland.drydrive.R
+
 // Важно: Убедитесь, что R класс вашего проекта импортирован, если Android Studio не сделала это автоматически
 // import ru.devsoland.drydrive.R
 
@@ -64,33 +67,14 @@ data class Recommendation(
     val activeAlpha: Float = 1.0f
 )
 
-data class DryDriveUiState(
-    val weather: Weather? = null,
-    val isLoadingWeather: Boolean = false,
-    val weatherErrorMessage: String? = null,
-    val searchQuery: String = "",
-    val citySearchResults: List<City> = emptyList(),
-    val isLoadingCities: Boolean = false,
-    val citySearchErrorMessage: String? = null,
-    val isSearchDropDownExpanded: Boolean = false,
-    val cityForDisplay: String = "",
-    val selectedCityObject: City? = null,
-    val dailyForecasts: List<DisplayDayWeather> = emptyList(),
-    val isLoadingForecast: Boolean = false,
-    val forecastErrorMessage: String? = null,
-    val currentLanguageCode: String = AppLanguage.SYSTEM.code,
-    val isInitialLoading: Boolean = true,
-    val recommendations: List<Recommendation> = emptyList()
-)
-
 @HiltViewModel
-class DryDriveViewModel @Inject constructor(
+class WeatherViewModel @Inject constructor(
     private val weatherApi: WeatherApi,
     private val userPreferencesManager: UserPreferencesManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DryDriveUiState())
-    val uiState: StateFlow<DryDriveUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(WeatherUiState())
+    val uiState: StateFlow<WeatherUiState> = _uiState.asStateFlow()
 
     private val apiKey = BuildConfig.WEATHER_API_KEY
     private var citySearchJob: Job? = null
@@ -175,12 +159,12 @@ class DryDriveViewModel @Inject constructor(
         return if (langCode.isEmpty()) null else langCode // OpenWeatherMap ожидает null или код языка, не пустую строку
     }
 
-    fun onEvent(event: DryDriveEvent) {
+    fun onEvent(event: WeatherEvent) {
         when (event) {
-            is DryDriveEvent.SearchQueryChanged -> handleSearchQueryChanged(event.query)
-            is DryDriveEvent.CitySelectedFromSearch -> handleCitySelected(event.city, event.formattedName)
-            DryDriveEvent.DismissCitySearchDropDown -> _uiState.update { it.copy(isSearchDropDownExpanded = false) }
-            DryDriveEvent.RefreshWeatherClicked -> {
+            is WeatherEvent.SearchQueryChanged -> handleSearchQueryChanged(event.query)
+            is WeatherEvent.CitySelectedFromSearch -> handleCitySelected(event.city, event.formattedName)
+            WeatherEvent.DismissCitySearchDropDown -> _uiState.update { it.copy(isSearchDropDownExpanded = false) }
+            WeatherEvent.RefreshWeatherClicked -> {
                 _uiState.value.selectedCityObject?.let {
                     fetchCurrentWeatherAndForecast(it) // Язык API будет взят из getApiLangCode()
                 } ?: run {
@@ -188,7 +172,7 @@ class DryDriveViewModel @Inject constructor(
                     findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true)
                 }
             }
-            DryDriveEvent.ClearWeatherErrorMessage -> _uiState.update {
+            WeatherEvent.ClearWeatherErrorMessage -> _uiState.update {
                 it.copy(weatherErrorMessage = null, forecastErrorMessage = null)
             }
         }
@@ -478,28 +462,37 @@ class DryDriveViewModel @Inject constructor(
 
             // Избегаем избыточной обработки, если язык не изменился
             // Особый случай для AppLanguage.SYSTEM, если currentLanguageCode уже пуст (означает системный)
-            if (language == AppLanguage.SYSTEM && previousLangCode.isEmpty()) return@launch
-            if (language != AppLanguage.SYSTEM && previousLangCode == newLangCode) return@launch
-
+            if (language == AppLanguage.SYSTEM && previousLangCode.isEmpty()) {
+                Log.d(TAG, "Language selection skipped: already system language and no specific language was previously set.")
+                return@launch
+            }
+            if (language != AppLanguage.SYSTEM && previousLangCode == newLangCode) {
+                Log.d(TAG, "Language selection skipped: language ${language.name} is already selected.")
+                return@launch
+            }
             Log.d(TAG, "Выбран язык: ${language.name}. Код: '$newLangCode'")
             userPreferencesManager.saveSelectedLanguage(language)
-            // UiState.currentLanguageCode будет обновлен через коллектор currentLanguage.onEach
+            // UiState.currentLanguageCode обновится через коллектор currentLanguage.onEach
+            // Это также вызовет обновление apiLangForUpdate и cityForDisplay через последующие вызовы
 
             val apiLangForUpdate = newLangCode.ifEmpty { null }
 
             _uiState.value.selectedCityObject?.let { city ->
                 Log.d(TAG, "Язык изменен, обновление данных для ${city.name}")
+                // Обновляем отображаемое имя города и поисковый запрос, если он совпадал с отображаемым именем
+                // Это изменение в UiState произойдет до перезагрузки погоды и до recreate
                 val newFormattedName = formatCityNameInternal(city, newLangCode)
+                val oldFormattedName = formatCityNameInternal(city, previousLangCode)
                 _uiState.update {
-                    // Обновляем отображаемое имя города и поисковый запрос, если он совпадал с отображаемым именем
                     it.copy(
                         cityForDisplay = newFormattedName,
-                        searchQuery = if (it.searchQuery == formatCityNameInternal(city, previousLangCode)) newFormattedName else it.searchQuery
+                        searchQuery = if (it.searchQuery == oldFormattedName) newFormattedName else it.searchQuery
+                        // currentLanguageCode будет обновлен через flow от userPreferencesManager,
+                        // который коллектится в init {} и обновляет uiState
                     )
                 }
                 fetchCurrentWeatherAndForecast(city, apiLangForUpdate)
             } ?: run {
-                // Если город не выбран, но отображается имя города по умолчанию, пытаемся перезагрузить его
                 if (_uiState.value.selectedCityObject == null && _uiState.value.cityForDisplay.contains(DEFAULT_CITY_FALLBACK, ignoreCase = true)) {
                     Log.d(TAG, "Язык изменен, город не выбран, обновление данных для города по умолчанию.")
                     findCityByNameAndFetchWeatherInternal(DEFAULT_CITY_FALLBACK, true, apiLangForUpdate)
@@ -511,13 +504,14 @@ class DryDriveViewModel @Inject constructor(
                 try {
                     val localeListToSet = if (newLangCode.isEmpty()) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(newLangCode)
                     AppCompatDelegate.setApplicationLocales(localeListToSet)
+                    Log.d(TAG, "AppCompatDelegate.setApplicationLocales called for API 33+ with '$newLangCode'")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Ошибка установки локали приложения: ${e.message}", e)
+                    Log.e(TAG, "Ошибка установки локали приложения на API 33+: ${e.message}", e)
                 }
-            } else {
-                // Для старых версий полагаемся на пересоздание Activity для применения новой конфигурации
-                _recreateActivityEvent.emit(Unit)
             }
+            // НЕЗАВИСИМО ОТ ВЕРСИИ ANDROID, вызываем recreate для теста
+            _recreateActivityEvent.emit(Unit)
+            Log.d(TAG, "Forced recreateActivityEvent emitted after language change.")
         }
     }
 
