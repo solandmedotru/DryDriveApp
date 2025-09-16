@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel // Используем наш основной ViewModel
 import ru.devsoland.drydrive.R
-import ru.devsoland.drydrive.data.preferences.AppLanguage
+import ru.devsoland.drydrive.common.model.AppLanguage
 
 /**
  * Composable функция для отображения отображаемого имени языка.

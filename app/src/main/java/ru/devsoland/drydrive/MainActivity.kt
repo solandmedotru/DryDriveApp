@@ -10,21 +10,16 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewmodel.compose.viewModel // Для Preview
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ru.devsoland.drydrive.common.util.setAppLocale
-import ru.devsoland.drydrive.data.preferences.AppLanguage
+import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
 import ru.devsoland.drydrive.di.UserPreferencesEntryPoint
 import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel

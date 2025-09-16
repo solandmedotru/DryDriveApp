@@ -1,16 +1,7 @@
-package ru.devsoland.drydrive.data.preferences
+package ru.devsoland.drydrive.common.model
 
 import androidx.annotation.StringRes
-import androidx.datastore.preferences.core.stringPreferencesKey
-import ru.devsoland.drydrive.R // Важно: импорт вашего R класса для доступа к строковым ресурсам
-
-/**
- * Ключи, используемые для хранения настроек языка в Preferences DataStore.
- */
-internal object LanguageKeys {
-    // Ключ для хранения кода выбранного языка (например, "ru", "en")
-    val SELECTED_LANGUAGE_CODE = stringPreferencesKey("selected_language_code")
-}
+import ru.devsoland.drydrive.R
 
 /**
  * Enum, представляющий доступные языки в приложении.
@@ -24,10 +15,11 @@ enum class AppLanguage(val code: String, @StringRes val displayNameResId: Int) {
 
     companion object {
         fun fromCode(code: String?): AppLanguage {
-            if (code == null || code.isEmpty()) { // "" (пустой код) это SYSTEM
+            if (code.isNullOrEmpty()) {
                 return SYSTEM
             }
-            return entries.find { it.code == code && it != SYSTEM } ?: SYSTEM // Если код не стандартный, возвращаем SYSTEM
+            // entries.find { it.code == code } должен работать для всех, включая SYSTEM, если его код ""
+            return entries.find { it.code == code } ?: SYSTEM // Если код не найден, возвращаем SYSTEM
         }
         // По умолчанию приложение будет использовать системный язык
         fun defaultLanguage(): AppLanguage = SYSTEM

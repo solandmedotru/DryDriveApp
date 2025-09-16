@@ -2,7 +2,7 @@ package ru.devsoland.drydrive.feature_weather.ui
 
 import ru.devsoland.drydrive.data.api.model.City
 import ru.devsoland.drydrive.data.api.model.Weather
-import ru.devsoland.drydrive.data.preferences.AppLanguage
+import ru.devsoland.drydrive.common.model.AppLanguage
 
 data class WeatherUiState(
     val weather: Weather? = null,

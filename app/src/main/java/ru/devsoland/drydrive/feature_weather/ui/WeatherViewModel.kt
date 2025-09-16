@@ -29,7 +29,7 @@ import ru.devsoland.drydrive.data.api.model.ForecastListItem
 import ru.devsoland.drydrive.data.api.model.ForecastResponse
 import ru.devsoland.drydrive.data.api.model.Weather
 import ru.devsoland.drydrive.data.WeatherApi
-import ru.devsoland.drydrive.data.preferences.AppLanguage
+import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
 import java.text.SimpleDateFormat
 import java.util.Date

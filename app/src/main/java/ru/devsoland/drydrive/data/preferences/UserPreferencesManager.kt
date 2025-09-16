@@ -11,18 +11,16 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.data.api.model.City // <-- Убедитесь, что импорт City корректен
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// AppLanguage должен быть доступен (в этом пакете или импортирован)
-// LanguageKeys должен быть доступен (в этом пакете или импортирован)
 
 private val Context.appPreferencesDataStore by preferencesDataStore(name = "user_settings_drydrive") // Обновил имя файла DataStore
 
-// Переименовываем LanguageKeys в UserPreferenceKeyHolder или подобное, чтобы было более общим
-object UserPreferenceKeys { // Был LanguageKeys, теперь более общий
+object UserPreferenceKeys {
     val SELECTED_LANGUAGE_CODE = stringPreferencesKey("selected_language_code")
 
     // Новые ключи для города
