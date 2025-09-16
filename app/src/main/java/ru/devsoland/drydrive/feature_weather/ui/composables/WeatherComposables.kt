@@ -1,4 +1,4 @@
-package ru.devsoland.drydrive.ui.composables
+package ru.devsoland.drydrive.feature_weather.ui.composables
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth

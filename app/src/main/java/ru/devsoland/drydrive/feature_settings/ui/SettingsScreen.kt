@@ -1,4 +1,4 @@
-package ru.devsoland.drydrive.ui.settings
+package ru.devsoland.drydrive.feature_settings.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column

@@ -1,4 +1,4 @@
-package ru.devsoland.drydrive.ui.composables
+package ru.devsoland.drydrive.feature_weather.ui.composables
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,11 +22,6 @@ import androidx.compose.ui.unit.sp
 import ru.devsoland.drydrive.feature_weather.ui.DisplayDayWeather
 // import androidx.compose.ui.unit.dp // Можно удалить, если все dp через dimensionResource
 import ru.devsoland.drydrive.R
-// Удаляем импорты кастомных цветов
-// import ru.devsoland.drydrive.ui.theme.AppAccentBlue
-// import ru.devsoland.drydrive.ui.theme.AppCardBackgroundDark
-// import ru.devsoland.drydrive.ui.theme.TextOnDarkBackground
-// import ru.devsoland.drydrive.ui.theme.AppDimens // Если используете
 
 @Composable
 fun DailyForecastRow(
