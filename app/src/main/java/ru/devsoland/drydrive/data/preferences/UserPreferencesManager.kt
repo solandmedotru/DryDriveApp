@@ -12,24 +12,25 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import ru.devsoland.drydrive.common.model.AppLanguage
-import ru.devsoland.drydrive.data.api.model.City // <-- Убедитесь, что импорт City корректен
+import ru.devsoland.drydrive.common.model.ThemeSetting // Добавлен импорт
+import ru.devsoland.drydrive.data.api.model.City
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 
-private val Context.appPreferencesDataStore by preferencesDataStore(name = "user_settings_drydrive") // Обновил имя файла DataStore
+private val Context.appPreferencesDataStore by preferencesDataStore(name = "user_settings_drydrive")
 
 object UserPreferenceKeys {
     val SELECTED_LANGUAGE_CODE = stringPreferencesKey("selected_language_code")
+    val SELECTED_THEME = stringPreferencesKey("selected_theme") // Ключ для темы
 
     // Новые ключи для города
     val LAST_CITY_NAME = stringPreferencesKey("last_city_name")
-    val LAST_CITY_LAT = doublePreferencesKey("last_city_lat") // Широта - Double
-    val LAST_CITY_LON = doublePreferencesKey("last_city_lon") // Долгота - Double
+    val LAST_CITY_LAT = doublePreferencesKey("last_city_lat")
+    val LAST_CITY_LON = doublePreferencesKey("last_city_lon")
     val LAST_CITY_COUNTRY = stringPreferencesKey("last_city_country")
-    val LAST_CITY_STATE = stringPreferencesKey("last_city_state") // State может быть null, сохраняем как String
-    // localNames пока не сохраняем, их получим из API при загрузке
+    val LAST_CITY_STATE = stringPreferencesKey("last_city_state")
 }
 
 @Singleton
@@ -57,11 +58,41 @@ class UserPreferencesManager @Inject constructor(@ApplicationContext private val
             }
         } catch (e: IOException) {
             Log.e("UserPrefsManager", "IOException while saving language.", e)
-            // Можно добавить обработку ошибки, например, через SharedFlow для UI
         } catch (e: Exception) {
             Log.e("UserPrefsManager", "Unexpected error saving language.", e)
         }
     }
+
+    // --- Настройки темы ---
+    val selectedThemeFlow: Flow<ThemeSetting> = context.appPreferencesDataStore.data
+        .catch { exception ->
+            handlePreferenceReadError("theme", exception)
+            emit(emptyPreferences())
+        }
+        .map { preferences ->
+            val themeName = preferences[UserPreferenceKeys.SELECTED_THEME]
+            Log.d("UserPrefsManager", "Read theme name: '$themeName'")
+            try {
+                if (themeName != null) ThemeSetting.valueOf(themeName) else ThemeSetting.SYSTEM
+            } catch (e: IllegalArgumentException) {
+                Log.w("UserPrefsManager", "Invalid theme name '$themeName' in preferences, defaulting to SYSTEM.")
+                ThemeSetting.SYSTEM
+            }
+        }
+
+    suspend fun saveSelectedTheme(theme: ThemeSetting) {
+        try {
+            context.appPreferencesDataStore.edit { preferences ->
+                preferences[UserPreferenceKeys.SELECTED_THEME] = theme.name
+                Log.d("UserPrefsManager", "Saved theme: '${theme.name}'")
+            }
+        } catch (e: IOException) {
+            Log.e("UserPrefsManager", "IOException while saving theme.", e)
+        } catch (e: Exception) {
+            Log.e("UserPrefsManager", "Unexpected error saving theme.", e)
+        }
+    }
+
 
     // --- Настройки последнего выбранного города ---
     val lastSelectedCityFlow: Flow<City?> = context.appPreferencesDataStore.data
@@ -76,9 +107,8 @@ class UserPreferencesManager @Inject constructor(@ApplicationContext private val
             val country = preferences[UserPreferenceKeys.LAST_CITY_COUNTRY]
 
             if (name != null && lat != null && lon != null && country != null) {
-                val state = preferences[UserPreferenceKeys.LAST_CITY_STATE] // State может быть null
+                val state = preferences[UserPreferenceKeys.LAST_CITY_STATE]
                 Log.d("UserPrefsManager", "Read last city: $name, $lat, $lon, $country, State: $state")
-                // localNames будут null, так как мы их не сохраняем. API их вернет.
                 City(name = name, lat = lat, lon = lon, country = country, state = state, localNames = null)
             } else {
                 Log.d("UserPrefsManager", "No valid last city data found in preferences.")
@@ -97,11 +127,10 @@ class UserPreferencesManager @Inject constructor(@ApplicationContext private val
                     if (city.state != null) {
                         preferences[UserPreferenceKeys.LAST_CITY_STATE] = city.state
                     } else {
-                        preferences.remove(UserPreferenceKeys.LAST_CITY_STATE) // Удаляем, если state null
+                        preferences.remove(UserPreferenceKeys.LAST_CITY_STATE)
                     }
                     Log.d("UserPrefsManager", "Saved last city: ${city.name}")
                 } else {
-                    // Если city is null, удаляем все ключи города (сброс)
                     preferences.remove(UserPreferenceKeys.LAST_CITY_NAME)
                     preferences.remove(UserPreferenceKeys.LAST_CITY_LAT)
                     preferences.remove(UserPreferenceKeys.LAST_CITY_LON)
@@ -123,7 +152,6 @@ class UserPreferencesManager @Inject constructor(@ApplicationContext private val
             Log.e("UserPrefsManager", "IOException while reading $preferenceName preferences.", exception)
         } else {
             Log.e("UserPrefsManager", "Unexpected error reading $preferenceName preferences.", exception)
-            // Не перебрасываем, чтобы не уронить приложение, map вернет значение по умолчанию
         }
     }
 }

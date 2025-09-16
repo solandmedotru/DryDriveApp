@@ -4,8 +4,6 @@
 
 <p align="center">
   <img src="https://github.com/solandmedotru/DryDriveApp/blob/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" alt="DryDrive App Icon" width="150"/>
-  <!-- TODO: Замените path/to/your/app_icon.png на реальный путь к иконке вашего приложения в репозитории -->
-  <!-- Или загрузите скриншоты: -->
 </p>
 
 ## 🌟 Описание

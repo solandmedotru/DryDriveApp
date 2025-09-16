@@ -7,28 +7,35 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-// import androidx.activity.viewModels // <-- УБИРАЕМ, если ViewModel получается в DryDriveApp
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.isSystemInDarkTheme // <-- Импорт для isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.runtime.Composable // <-- Добавлен импорт Composable
+import androidx.compose.runtime.collectAsState // <-- Импорт для collectAsState
+import androidx.compose.runtime.getValue // <-- Импорт для getValue
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.lifecycleScope // ОСТАВЛЯЕМ, если есть recreateActivityEvent
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch // ОСТАВЛЯЕМ, если есть recreateActivityEvent
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ru.devsoland.drydrive.common.util.setAppLocale
 import ru.devsoland.drydrive.common.model.AppLanguage
+import ru.devsoland.drydrive.common.model.ThemeSetting // <-- Импорт ThemeSetting
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
 import ru.devsoland.drydrive.di.UserPreferencesEntryPoint
-import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel // <-- УБИРАЕМ, если ViewModel не создается здесь
+import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
-
+import javax.inject.Inject // <-- Импорт для @Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject // Внедряем UserPreferencesManager
+    lateinit var userPreferencesManager: UserPreferencesManager
 
     private val weatherViewModel: WeatherViewModel by viewModels()
 
@@ -38,29 +45,22 @@ class MainActivity : ComponentActivity() {
             "attachBaseContext CALLED. Initial base context locale: ${newBase.resources.configuration.locale}"
         )
 
-        val userPreferencesManager: UserPreferencesManager
-        try {
+        // Логика для языка остается здесь, так как она нужна очень рано
+        val tempUserPreferencesManager: UserPreferencesManager = try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 newBase.applicationContext,
                 UserPreferencesEntryPoint::class.java
             )
-            userPreferencesManager = entryPoint.getUserPreferencesManager()
-            Log.d(
-                "MainActivityLifecycle",
-                "UserPreferencesManager obtained successfully via EntryPoint."
-            )
-        } catch (e: IllegalStateException) {
-            Log.e(
-                "MainActivityLifecycle",
-                "Hilt not ready in attachBaseContext to get UserPreferencesManager: ${e.message}. Using default base context.",
-                e
-            )
-            super.attachBaseContext(newBase)
-            return
+            entryPoint.getUserPreferencesManager().also {
+                Log.d(
+                    "MainActivityLifecycle",
+                    "UserPreferencesManager obtained successfully via EntryPoint for language."
+                )
+            }
         } catch (e: Exception) {
             Log.e(
                 "MainActivityLifecycle",
-                "Unexpected error getting UserPreferencesManager: ${e.message}. Using default base context.",
+                "Error getting UserPreferencesManager in attachBaseContext: ${e.message}. Using default base context.",
                 e
             )
             super.attachBaseContext(newBase)
@@ -73,12 +73,12 @@ class MainActivity : ComponentActivity() {
                 "attachBaseContext: Attempting to get language code via runBlocking..."
             )
             runBlocking {
-                userPreferencesManager.selectedLanguageFlow.first().code
+                tempUserPreferencesManager.selectedLanguageFlow.first().code
             }
         } catch (e: Exception) {
             Log.e(
                 "MainActivityLifecycle",
-                "Error getting language code in runBlocking for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.",
+                "Error getting language code for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.",
                 e
             )
             AppLanguage.SYSTEM.code
@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // ... ваш код onCreate для логов локали ...
+        // ... ваш существующий код onCreate для логов локали ...
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             Log.d(
                 "MainActivityLifecycle",
@@ -138,12 +138,24 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            DryDriveTheme {
+            // Получаем текущую настройку темы из UserPreferencesManager
+            val currentThemeSetting by userPreferencesManager.selectedThemeFlow.collectAsState(
+                initial = ThemeSetting.SYSTEM // Начальное значение, пока Flow не эмитирует первое
+            )
+
+            // Определяем, использовать ли темную тему
+            val useDarkTheme = when (currentThemeSetting) {
+                ThemeSetting.LIGHT -> false
+                ThemeSetting.DARK -> true
+                ThemeSetting.SYSTEM -> isSystemInDarkTheme()
+            }
+
+            DryDriveTheme(darkTheme = useDarkTheme) { // Передаем результат в DryDriveTheme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    DryDriveApp(weatherViewModel = weatherViewModel) // <--- ПЕРЕДАЕМ ViewModel
+                    DryDriveApp(weatherViewModel = weatherViewModel)
                 }
             }
         }

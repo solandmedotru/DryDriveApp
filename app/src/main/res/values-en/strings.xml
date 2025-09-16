@@ -109,4 +109,7 @@
     <string name="settings_language_title">Application Language</string>
     <string name="map_screen_placeholder">Map (under development)</string>
     <string name="language_system">System</string>
+
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_dark_mode_toggle">Dark Theme</string>
 </resources>

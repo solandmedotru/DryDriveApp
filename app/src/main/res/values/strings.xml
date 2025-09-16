@@ -110,5 +110,8 @@
     <string name="language_system">Системный</string>
 
 
+    <string name="settings_theme_title">Тема оформления</string>
+    <string name="settings_theme_dark_mode_toggle">Темная тема</string>
+
 
 </resources>

@@ -8,8 +8,5 @@ class DryDriveApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // На данный момент здесь ничего не делаем,
-        // связанного с языком. Это будет добавлено позже.
-        // Hilt будет инициализирован благодаря аннотации @HiltAndroidApp.
     }
 }

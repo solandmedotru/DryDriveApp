@@ -97,17 +97,15 @@ fun DryDriveApp(
                 when (selectedItemIndex) {
                     0 -> // Экран Погоды
                         WeatherScreen(
-                            modifier = Modifier.padding(paddingValues).fillMaxSize(), // Передаем paddingValues
-                            viewModel = weatherViewModel // Передаем ту же ViewModel, чтобы uiState был синхронизирован
-                            // или WeatherScreen может сам получить через hiltViewModel()
-                            // если вы хотите разные инстансы или он не нужен в DryDriveApp напрямую
+                            modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                            viewModel = weatherViewModel
                         )
                     1 -> MapScreenPlaceholder(
                         modifier = Modifier.padding(paddingValues).fillMaxSize()
                     )
-                    2 -> SettingsScreen(
-                        modifier = Modifier.padding(paddingValues).fillMaxSize(),
-                        viewModel = weatherViewModel // Передаем ту же ViewModel
+                    2 -> SettingsScreen( // <--- ИЗМЕНЕНИЕ ЗДЕСЬ
+                        modifier = Modifier.padding(paddingValues).fillMaxSize()
+                        // viewModel = weatherViewModel <-- ЭТА СТРОКА УДАЛЕНА
                     )
                 }
             }
