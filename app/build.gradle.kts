@@ -77,6 +77,7 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.3.2")
     implementation("androidx.navigation:navigation-compose:2.9.4")
     implementation("androidx.compose.ui:ui-tooling:1.9.1")
+    implementation(libs.androidx.compose.foundation)
     debugImplementation("androidx.compose.ui:ui-tooling-data:1.9.1")
 
     // Retrofit + OkHttp + Serialization

@@ -88,6 +88,10 @@
     <string name="action_collapse">Collapse</string>
     <string name="action_expand">Expand</string>
     <string name="details_precipitation_probability">Precipitation probability:</string>
+    <string name="details_temp_min_max_label_short">Мин/Макс</string>
+    <string name="details_visibility_label_short">Видимость</string>
+    <string name="details_cloudiness_label_short">Облачность</string>
+
 
     <!-- Recommendations -->
     <string name="rec_drink_water_default">Drink water!</string>
@@ -162,5 +166,7 @@
 
     <!-- Placeholder for map screen -->
     <string name="map_screen_placeholder">Map (under development)</string>
+    strings.xml: <string name="recommendation_icon_description">Иконка рекомендации</string>
+
 
 </resources>

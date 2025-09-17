@@ -88,6 +88,10 @@
     <string name="action_collapse">Свернуть</string>
     <string name="action_expand">Развернуть</string>
     <string name="details_precipitation_probability">Вероятность осадков:</string>
+    <string name="details_temp_min_max_label_short">Мин/Макс</string>
+    <string name="details_visibility_label_short">Видимость</string>
+    <string name="details_cloudiness_label_short">Облачность</string>
+
 
     <!-- Recommendations -->
     <string name="rec_drink_water_default">Пейте воду!</string>
@@ -162,5 +166,6 @@
 
     <!-- Placeholder for map screen -->
     <string name="map_screen_placeholder">Карта (в разработке)</string>
+    strings.xml: <string name="recommendation_icon_description">Иконка рекомендации</string>
 
 </resources>

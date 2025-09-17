@@ -88,9 +88,9 @@ class WeatherViewModel @Inject constructor(
     private fun observeSearchQueryChanges() {
         viewModelScope.launch {
             searchQueryFlow
-                .debounce(700L)
+                .debounce(2000L) // Изменено на 2000L (2 секунды)
                 .collectLatest { debouncedQuery ->
-                    if (debouncedQuery.length >= 2) {
+                    if (debouncedQuery.length >= 2) { // Минимальная длина осталась 2
                         performCitySearch(debouncedQuery)
                     } else {
                         if (debouncedQuery.isNotEmpty()) {
@@ -209,13 +209,6 @@ class WeatherViewModel @Inject constructor(
             is WeatherEvent.SearchQueryChanged -> {
                 val query = event.query
                 _uiState.update { it.copy(citySearchQuery = query) }
-                if (query.isEmpty()) {
-                    _uiState.update { it.copy(cities = emptyList(), isLoadingCities = false, citySearchErrorMessage = null) }
-                } else if (query.length < 2) {
-                    _uiState.update { it.copy(cities = emptyList(), isLoadingCities = false, citySearchErrorMessage = application.getString(R.string.city_search_too_short)) }
-                } else {
-                    _uiState.update { it.copy(citySearchErrorMessage = null) }
-                }
                 searchQueryFlow.value = query
             }
             is WeatherEvent.CitySelectedFromSearch -> {
@@ -303,7 +296,11 @@ class WeatherViewModel @Inject constructor(
 
             when (val weatherResult = getCurrentWeatherUseCase(cityName = city.originalNameFromApi ?: city.displayName, lat = city.lat, lon = city.lon, lang = apiLang)) {
                 is Result.Success -> {
-                    fetchedWeatherUiModel = weatherResult.data.toUiModel(application.applicationContext)
+                    var tempWeatherUiModel = weatherResult.data.toUiModel(application.applicationContext)
+                    tempWeatherUiModel.sunriseEpochMillis?.let {
+                        tempWeatherUiModel = tempWeatherUiModel.copy(nextSunriseEpochMillis = it + (24 * 60 * 60 * 1000))
+                    }
+                    fetchedWeatherUiModel = tempWeatherUiModel
                 }
                 is Result.Error -> {
                     Log.e(tag, "Failed to fetch current weather for ${city.displayName}. Error: ${weatherResult.message}", weatherResult.exception)
@@ -341,10 +338,10 @@ class WeatherViewModel @Inject constructor(
             }
 
             val currentRecommendations = generateRecommendations(fetchedWeatherUiModel, processedForecasts)
-
+            
             _uiState.update {
                 it.copy(
-                    weather = fetchedWeatherUiModel ?: it.weather, 
+                    weather = fetchedWeatherUiModel, // Уже содержит nextSunriseEpochMillis, если sunriseEpochMillis был не null
                     dailyForecasts = processedForecasts,
                     isLoadingWeather = false,
                     isLoadingForecast = false, 

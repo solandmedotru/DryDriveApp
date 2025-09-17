@@ -8,21 +8,15 @@ import ru.devsoland.drydrive.feature_weather.ui.util.getWeatherIconResource
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 import kotlin.math.roundToInt
 
 /**
  * Преобразует доменную модель [WeatherDomain] в UI модель [WeatherDetailsUiModel].
  */
 fun WeatherDomain.toUiModel(context: Context): WeatherDetailsUiModel {
-    // Форматтер для отображения времени восхода/заката в локальной таймзоне пользователя
-    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
-        // Комментарии ниже объясняют, что время от API приходит в UTC, а SimpleDateFormat по умолчанию
-        // использует таймзону устройства. Для корректного преобразования UTC в локальное время
-        // с учетом смещения от API (this.timezone), мы прибавляем это смещение к UTC timestamp.
-    }
+    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-    val windDirection = when (this.windDeg) {
+    val windDirectionStr = when (this.windDeg) {
         in 0..22 -> context.getString(R.string.wind_dir_n)
         in 23..67 -> context.getString(R.string.wind_dir_ne)
         in 68..112 -> context.getString(R.string.wind_dir_e)
@@ -34,35 +28,47 @@ fun WeatherDomain.toUiModel(context: Context): WeatherDetailsUiModel {
         in 338..360 -> context.getString(R.string.wind_dir_n)
         else -> ""
     }
-    val windInfo = "${this.windSpeed.roundToInt()} ${context.getString(R.string.unit_mps)} $windDirection"
+    val windInfoForUi = "${this.windSpeed.roundToInt()} ${context.getString(R.string.unit_mps)} $windDirectionStr"
 
-    // Получаем время восхода и заката в миллисекундах UTC для индикатора прогресса
-    // this.sunrise и this.sunset приходят из WeatherDomain как секунды UTC
     val sunriseUtcEpochMillis = this.sunrise * 1000L
     val sunsetUtcEpochMillis = this.sunset * 1000L
 
+    val currentTemperature = this.temperature.roundToInt()
+    val conditionDescription = this.weatherConditions.firstOrNull()?.description
+        ?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() } ?: ""
+    
+    val weatherConditionDescLower = conditionDescription.lowercase(Locale.getDefault())
+
+    val washRecommendationText = when {
+        weatherConditionDescLower.contains(context.getString(R.string.condition_rain).lowercase(Locale.getDefault())) ||
+        weatherConditionDescLower.contains(context.getString(R.string.condition_snow).lowercase(Locale.getDefault())) ||
+        weatherConditionDescLower.contains(context.getString(R.string.condition_thunderstorm).lowercase(Locale.getDefault())) ||
+        weatherConditionDescLower.contains(context.getString(R.string.condition_drizzle).lowercase(Locale.getDefault())) -> context.getString(R.string.wash_not_recommended)
+        weatherConditionDescLower.contains(context.getString(R.string.condition_mist).lowercase(Locale.getDefault())) ||
+        weatherConditionDescLower.contains(context.getString(R.string.condition_fog).lowercase(Locale.getDefault())) -> context.getString(R.string.wash_possible_limited_visibility)
+        currentTemperature > 5 -> context.getString(R.string.wash_great_day)
+        else -> context.getString(R.string.wash_good_weather_but_cool) 
+    }
+
+    val feelsLikeValueStr = "${this.feelsLike.roundToInt()}°"
+
     return WeatherDetailsUiModel(
-        cityName = this.cityNameFromApi,
-        temperature = "${this.temperature.roundToInt()}°",
-        feelsLike = "${context.getString(R.string.details_feels_like)} ${this.feelsLike.roundToInt()}°",
-        tempMinMax = "${context.getString(R.string.details_temp_min_max_format, this.tempMin.roundToInt(), this.tempMax.roundToInt())}",
-        pressure = "${this.pressure} ${context.getString(R.string.unit_hpa)}",
-        humidity = "${this.humidity}%",
-        visibility = "${this.visibility / 1000} ${context.getString(R.string.unit_km)}",
-        windSpeed = windInfo,
-        cloudiness = "${this.cloudiness}%",
-        // Строки sunrise/sunset для отображения в UI (локальное время)
-        // this.timezone - это смещение от UTC в секундах, предоставленное API
-        sunrise = timeFormat.format(Date((this.sunrise + this.timezone) * 1000L)),
-        sunset = timeFormat.format(Date((this.sunset + this.timezone) * 1000L)),
-        weatherConditionDescription = this.weatherConditions.firstOrNull()?.description?.replaceFirstChar { 
-            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() 
-        } ?: "",
+        // Актуальные поля для нового UI
+        cityName = this.cityNameFromApi ?: context.getString(R.string.city_not_found),
+        temperature = "${currentTemperature}°",
+        weatherConditionDescription = conditionDescription,
         weatherIconRes = getWeatherIconResource(this.weatherConditions.firstOrNull()?.icon),
-        dt = this.sunrise, // Используем dt из WeatherDomain
-        
-        // Новые поля для индикатора прогресса (миллисекунды UTC)
+        washRecommendationText = washRecommendationText,
+        feelsLikeValue = feelsLikeValueStr,
+        humidity = "${this.humidity}%",
+        windSpeed = windInfoForUi, 
+        pressure = "${this.pressure} ${context.getString(R.string.unit_hpa)}",
+        sunrise = timeFormat.format(Date((this.sunrise + this.timezone) * 1000L)), 
+        sunset = timeFormat.format(Date((this.sunset + this.timezone) * 1000L)),   
         sunriseEpochMillis = sunriseUtcEpochMillis,
         sunsetEpochMillis = sunsetUtcEpochMillis
+
+        // Присваивание старым полям (feelsLike (старое), tempMinMax, visibility, cloudiness, dt) УДАЛЕНО.
+        // Они получат значения по умолчанию null из определения data class WeatherDetailsUiModel.
     )
 }
