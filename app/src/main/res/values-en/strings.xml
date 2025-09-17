@@ -1,42 +1,91 @@
 <resources>
-    <string name="app_name">DryDrive</string> <!-- Application name usually doesn't change or is localized very carefully -->
+    <string name="app_name">DryDrive</string>
 
     <!-- DryDriveScreen & TopAppBar -->
     <string name="search_city_placeholder">Search city...</string>
     <string name="clear_search_description">Clear</string>
-    <string name="location_description">Location</string> <!-- For current location button -->
+    <string name="location_description">Location</string>
     <string name="select_city_prompt">Select city</string>
     <string name="select_city_action">Select city</string>
-    <string name="city_not_found">City not found. Please check the name.</string> <!-- Обновлено для большей ясности -->
+    <string name="city_not_found">City not found. Check the name.</string>
     <string name="action_ok">OK</string>
     <string name="action_search">Search</string>
     <string name="action_menu">Menu</string>
     <string name="drawer_menu_todo">Menu (TODO)</string>
+    <string name="city_not_found_short">Not found</string>
 
-    <!-- Error Messages & Statuses from ViewModel -->
-    <string name="city_not_found_short">Not Found</string>
+    <!-- Error messages and states from ViewModel -->
     <string name="error_loading_cities">Failed to load city list.</string>
     <string name="error_loading_weather">Failed to load weather data.</string>
     <string name="error_unknown">An unknown error occurred.</string>
     <string name="error_location_unavailable">Location unavailable. Check permissions or enable location services.</string>
-    <string name="error_network_unavailable">Network unavailable. Check internet connection.</string>
+    <string name="error_network_unavailable">Network unavailable. Check your internet connection.</string>
     <string name="status_getting_location_weather">Getting weather for your location…</string>
-    <string name="label_current_location">Current Location</string>
+    <string name="label_current_location">Current location</string>
+    <string name="city_search_too_short">Enter at least 2 characters</string>
+    <string name="city_search_no_results">City not found</string>
+    <string name="city_search_error">City search error</string>
+    <string name="hide_search_description">Hide search</string>
+    <string name="city_search_no_results_in_dropdown">No results</string>
+    <string name="error_api_key_invalid">API key is invalid or unauthorized. Please check your key.</string>
 
     <!-- Car Wash Recommendations -->
     <string name="wash_not_recommended">Washing not recommended.</string>
     <string name="wash_possible_limited_visibility">Washing possible, but visibility is limited.</string>
     <string name="wash_great_day">Great day for a wash!</string>
-    <string name="wash_good_weather_but_cool">Weather is good, but it\'s cool for washing.</string> <!-- Note the escaped apostrophe -->
+    <string name="wash_good_weather_but_cool">Good weather, but a bit cool for washing.</string>
     <string name="car_dirty_description">Dirty car</string>
     <string name="car_clean_description">Clean car</string>
     <string name="city_background_description">City background</string>
 
+    <!-- Weather Details -->
+    <string name="weather_data_unavailable">No data</string>
+    <string name="details_weather_description">Detailed weather</string>
+    <string name="details_feels_like">Feels like:</string>
+    <string name="details_temp_min_max_format">Min: %1$d° Max: %2$d°</string>
+    <string name="details_wind_label">Wind</string>
+    <string name="details_humidity_label">Humidity</string>
+    <string name="details_pressure_label">Pressure</string>
+    <string name="details_visibility_label">Visibility</string>
+    <string name="details_clouds_label">Cloudiness</string>
+    <string name="details_sunrise_label">Sunrise</string>
+    <string name="details_sunset_label">Sunset</string>
+    <string name="details_precipitation">Precipitation</string>
+
+    <!-- Units & Formatting (including for ForecastItemMapper) -->
+    <string name="unit_temperature_celsius">°</string>
+    <string name="unit_mps">m/s</string>
+    <string name="unit_hpa">hPa</string>
+    <string name="unit_km">km</string>
+    <string name="format_pressure_hpa">%1$s hPa</string>
+    <string name="format_wind_speed_mps">%1$d m/s</string>
+    <string name="format_visibility_km">%1$s km</string>
+
+    <!-- Wind Directions -->
+    <string name="wind_dir_n">N</string>
+    <string name="wind_dir_ne">NE</string>
+    <string name="wind_dir_e">E</string>
+    <string name="wind_dir_se">SE</string>
+    <string name="wind_dir_s">S</string>
+    <string name="wind_dir_sw">SW</string>
+    <string name="wind_dir_w">W</string>
+    <string name="wind_dir_nw">NW</string>
+
+    <!-- Weather Condition Keywords (for logic in WeatherScreenContent) -->
+    <string name="condition_rain">rain</string>
+    <string name="condition_snow">snow</string>
+    <string name="condition_thunderstorm">thunderstorm</string>
+    <string name="condition_drizzle">drizzle</string>
+    <string name="condition_mist">mist</string>
+    <string name="condition_fog">fog</string>
 
     <!-- Forecast -->
     <string name="forecast_now">Now</string>
-    <string name="forecast_icon_description_template">%s weather</string>
+    <string name="forecast_icon_description_template">Weather: %s</string>
     <string name="forecast_unavailable">Forecast unavailable</string>
+    <string name="action_collapse">Collapse</string>
+    <string name="action_expand">Expand</string>
+    <string name="details_precipitation_probability">Precipitation probability:</string>
 
     <!-- Recommendations -->
     <string name="rec_drink_water_default">Drink water!</string>
@@ -50,33 +99,32 @@
     <string name="rec_uv_protection_desc_active">Active recommendation: UV protection</string>
 
     <string name="rec_tire_change_default">Tire change</string>
-    <string name="rec_tire_change_active">Frost!</string>
+    <string name="rec_tire_change_active">Freezing!</string>
     <string name="rec_tire_change_desc_default">Recommendation: tire change</string>
-    <string name="rec_tire_change_desc_active">Active recommendation: frost</string>
+    <string name="rec_tire_change_desc_active">Active recommendation: freezing</string>
 
     <string name="rec_umbrella_default">Take an umbrella</string>
     <string name="rec_umbrella_active">Need an umbrella!</string>
     <string name="rec_umbrella_desc_default">Recommendation: take an umbrella</string>
     <string name="rec_umbrella_desc_active">Active recommendation: take an umbrella</string>
 
-    <!-- NEW SHORT Recommendations -->
-    <string name="rec_dress_warmly_default">Dress warm</string>
-    <string name="rec_dress_warmly_active">Dress warm!</string>
+    <string name="rec_dress_warmly_default">Warmer</string>
+    <string name="rec_dress_warmly_active">Warmer!</string>
     <string name="rec_dress_warmly_desc_default">Recommendation: Dress warmly.</string>
     <string name="rec_dress_warmly_desc_active">Active recommendation: Dress warmly.</string>
 
-    <string name="rec_limit_activity_default">Limit activity</string>
-    <string name="rec_limit_activity_active">Limit activity!</string>
+    <string name="rec_limit_activity_default">Less outdoors</string>
+    <string name="rec_limit_activity_active">Less outdoors!</string>
     <string name="rec_limit_activity_desc_default">Recommendation: Limit outdoor activity.</string>
     <string name="rec_limit_activity_desc_active">Active recommendation: Limit outdoor activity.</string>
 
-    <string name="rec_check_tires_default">Check tires</string>
-    <string name="rec_check_tires_active">Check tires!</string>
+    <string name="rec_check_tires_default">Tires</string>
+    <string name="rec_check_tires_active">Tires!</string>
     <string name="rec_check_tires_desc_default">Recommendation: Check tire pressure.</string>
     <string name="rec_check_tires_desc_active">Active recommendation: Check tire pressure.</string>
 
-    <string name="rec_careful_roads_default">Road care</string>
-    <string name="rec_careful_roads_active">Road care!</string>
+    <string name="rec_careful_roads_default">On the roads</string>
+    <string name="rec_careful_roads_active">On the roads!</string>
     <string name="rec_careful_roads_desc_default">Recommendation: Be careful on the roads.</string>
     <string name="rec_careful_roads_desc_active">Active recommendation: Be careful on the roads.</string>
 
@@ -92,72 +140,25 @@
 
     <string name="rec_light_clothes_default">Light clothes</string>
     <string name="rec_light_clothes_active">Light clothes!</string>
-    <string name="rec_light_clothes_desc_default">Recommendation: Wear light and breathable clothes.</string>
-    <string name="rec_light_clothes_desc_active">Active recommendation: Wear light and breathable clothes.</string>
+    <string name="rec_light_clothes_desc_default">Recommendation: Wear light and breathable clothing.</string>
+    <string name="rec_light_clothes_desc_active">Active recommendation: Wear light and breathable clothing.</string>
 
     <!-- Bottom Navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_map">Map</string>
     <string name="nav_settings">Settings</string>
+    <string name="open_navigation_drawer">Open navigation drawer</string>
+    <string name="bottom_nav_weather">Weather</string>
 
     <!-- Settings -->
-    <string name="open_navigation_drawer">Open Navigation drawer</string>
     <string name="language_russian">Russian</string>
     <string name="language_english">English</string>
-    <string name="settings_language_title">Application Language</string>
-    <string name="map_screen_placeholder">Map (under development)</string>
     <string name="language_system">System</string>
-
+    <string name="settings_language_title">App Language</string>
     <string name="settings_theme_title">Theme</string>
-    <string name="settings_theme_dark_mode_toggle">Dark Theme</string>
+    <string name="settings_theme_dark_mode_toggle">Dark theme</string>
 
-
-    <!-- Units and formats (some might already exist or need correction) -->
-    <string name="unit_temperature_celsius">°C</string>
-    <string name="format_pressure_hpa">%1$s hPa</string>
-    <string name="format_wind_speed_mps">%1$d m/s</string>
-    <string name="format_visibility_km">%1$s km</string>
-    <string name="weather_data_unavailable">Data unavailable</string>
-
-    <!-- Wind directions (some might already exist or need correction) -->
-    <string name="wind_dir_n">N</string>
-    <string name="wind_dir_ne">NE</string>
-    <string name="wind_dir_e">E</string>
-    <string name="wind_dir_se">SE</string>
-    <string name="wind_dir_s">S</string>
-    <string name="wind_dir_sw">SW</string>
-    <string name="wind_dir_w">W</string>
-    <string name="wind_dir_nw">NW</string>
-
-    <!-- For expandable forecast cards -->
-    <string name="action_collapse">Collapse</string>
-    <string name="action_expand">Expand</string>
-    <string name="details_feels_like">Feels like:</string>
-    <string name="details_humidity">Humidity:</string>
-    <string name="details_pressure_hpa_label">Pressure:</string> <!-- Label for pressure -->
-    <string name="pressure_units_hpa">hPa</string> <!-- Unit for separate display if needed -->
-    <string name="details_wind_speed_mps_label">Wind:</string> <!-- Label for wind -->
-    <string name="wind_speed_units_mps">m/s</string> <!-- Unit for separate display if needed -->
-    <string name="details_visibility_km_label">Visibility:</string> <!-- Label for visibility -->
-    <string name="visibility_units_km">km</string> <!-- Unit for separate display if needed -->
-    <string name="details_clouds">Clouds:</string>
-    <string name="details_precipitation_probability">Precipitation probability:</string>
-
-    <string name="city_search_too_short">Enter at least 2 characters</string>
-    <string name="city_search_no_results">City not found</string>
-    <string name="city_search_error">City search error</string>
-    <string name="hide_search_description">Скрыть поиск</string>
-    <string name="city_search_no_results_in_dropdown">Нет результатов</string>
-    <string name="bottom_nav_weather">Погода</string>
-    <string name="details_weather_description">Подробная погода</string>
-    <string name="error_api_key_invalid">API key is invalid or unauthorized. Please check your key.</string>
-    <string name="details_feels_like_short">Ощущается</string>
-    <string name="details_humidity_short">Влажность</string>
-    <string name="details_wind_label_short">Ветер</string>
-    <string name="details_pressure_label_short">Давление</string>
-    <string name="details_visibility_label_short">Видимость</string>
-    <string name="details_clouds_short">Облачность</string>
-    <string name="details_precipitation_short">Осадки</string>
-
+    <!-- Placeholder for map screen -->
+    <string name="map_screen_placeholder">Map (under development)</string>
 
 </resources>

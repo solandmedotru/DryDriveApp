@@ -1,5 +1,6 @@
 <resources>
     <!-- Font Sizes -->
+    <dimen name="font_size_huge_title">96sp</dimen> <!-- НОВЫЙ -->
     <dimen name="font_size_large_title">72sp</dimen>
     <dimen name="font_size_title">28sp</dimen>
     <dimen name="font_size_medium_emphasis">18sp</dimen>
@@ -8,41 +9,41 @@
     <dimen name="font_size_small_caption">12sp</dimen>
 
     <!-- Icon Sizes -->
+    <dimen name="icon_size_very_large">72dp</dimen> <!-- НОВЫЙ -->
     <dimen name="icon_size_small">18dp</dimen>
     <dimen name="icon_size_standard">24dp</dimen>
     <dimen name="icon_size_medium">20dp</dimen>
     <dimen name="icon_size_large">36dp</dimen>
+    <dimen name="icon_size_medium_large">30dp</dimen>
 
     <dimen name="placeholder_text_short_width">40dp</dimen>
     <dimen name="placeholder_text_medium_width">30dp</dimen>
     <dimen name="placeholder_text_width">16dp</dimen>
     <dimen name="placeholder_icon_size">36dp</dimen>
 
-
     <!-- Spacing -->
+    <dimen name="spacing_extra_small">2dp</dimen>
     <dimen name="spacing_small">4dp</dimen>
     <dimen name="spacing_medium">8dp</dimen>
+    <dimen name="spacing_medium_large">12dp</dimen>
     <dimen name="spacing_large">16dp</dimen>
     <dimen name="spacing_xlarge">24dp</dimen>
-    <dimen name="spacing_medium_large">12dp</dimen>
     <dimen name="padding_none">0dp</dimen>
-
+    <!-- Дублирующиеся padding_* ниже, оставим spacing_* как основные -->
+    <!-- <dimen name="padding_small">8dp</dimen> -->
+    <!-- <dimen name="padding_medium">16dp</dimen> -->
 
     <!-- Radius -->
-    <dimen name="corner_radius_medium">12dp</dimen>
     <dimen name="corner_radius_small">4dp</dimen>
+    <dimen name="corner_radius_medium">12dp</dimen>
+    <dimen name="corner_radius_large">16dp</dimen>
 
     <dimen name="forecast_card_width">80dp</dimen>
     <dimen name="forecast_card_height">120dp</dimen>
+    <dimen name="forecast_card_width_expanded">100dp</dimen>
 
-    <dimen name="spacing_extra_small">2dp</dimen>
     <dimen name="chip_min_height">80dp</dimen>
 
     <dimen name="top_app_bar_height">56dp</dimen>
     <dimen name="daily_forecast_row_height">120dp</dimen>
-    <dimen name="padding_small">8dp</dimen>
-    <dimen name="padding_medium">16dp</dimen>
-    <dimen name="corner_radius_large">16dp</dimen>
-    <dimen name="forecast_card_width_expanded">100dp</dimen>
-    <dimen name="icon_size_medium_large">30dp</dimen>
 </resources>

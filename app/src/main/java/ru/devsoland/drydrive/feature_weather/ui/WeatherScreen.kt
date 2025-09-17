@@ -1,22 +1,17 @@
 package ru.devsoland.drydrive.feature_weather.ui
 
-// Все ваши существующие импорты для HomeScreenContent ...
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -29,18 +24,12 @@ import androidx.compose.ui.unit.sp
 import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.feature_weather.ui.composables.DailyForecastPlaceholder
 import ru.devsoland.drydrive.feature_weather.ui.composables.DailyForecastRow
+import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationInfoDialog
 import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationsDisplaySection
 import ru.devsoland.drydrive.feature_weather.ui.composables.WeatherDetails
-import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationInfoDialog
+import ru.devsoland.drydrive.feature_weather.ui.model.WeatherDetailsUiModel
 import ru.devsoland.drydrive.ui.theme.CityBackgroundOverlay
 import java.util.Locale
-
-import android.util.Log
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext // *** ДОБАВЛЕН ИМПОРТ ***
-import androidx.appcompat.app.AppCompatDelegate // *** ДОБАВЛЕН ИМПОРТ ***
-import android.os.Build // *** ДОБАВЛЕН ИМПОРТ ***
 
 @Composable
 fun WeatherScreen(
@@ -50,12 +39,11 @@ fun WeatherScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     WeatherScreenContent(
-        modifier = modifier, 
+        modifier = modifier,
         uiState = uiState,
         onEvent = viewModel::onEvent
     )
 }
-
 
 @Composable
 fun WeatherScreenContent(
@@ -63,17 +51,30 @@ fun WeatherScreenContent(
     uiState: WeatherUiState,
     onEvent: (WeatherEvent) -> Unit
 ) {
-    val carImageResId = when (uiState.weather?.weather?.getOrNull(0)?.main?.lowercase(Locale.ROOT)) {
-        "rain", "snow", "thunderstorm", "drizzle", "mist", "fog" -> R.drawable.car_dirty
+    val weatherConditionDesc = uiState.weather?.weatherConditionDescription?.lowercase(Locale.getDefault()) ?: ""
+    val currentTempForWash = uiState.weather?.temperature?.filter { it.isDigit() || it == '-' }?.toIntOrNull()
+
+    val carImageResId = when {
+        weatherConditionDesc.contains(stringResource(R.string.condition_rain).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_snow).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_thunderstorm).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_drizzle).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_mist).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_fog).lowercase(Locale.getDefault())) -> R.drawable.car_dirty
         else -> R.drawable.car_clean
     }
     val carContentDescription = if (carImageResId == R.drawable.car_dirty) stringResource(R.string.car_dirty_description) else stringResource(R.string.car_clean_description)
-    val washRecommendation = when (uiState.weather?.weather?.getOrNull(0)?.main?.lowercase(Locale.ROOT)) {
-        "rain", "snow", "thunderstorm", "drizzle" -> stringResource(R.string.wash_not_recommended)
-        "mist", "fog" -> stringResource(R.string.wash_possible_limited_visibility)
-        else -> if (uiState.weather != null && uiState.weather.main.temp > 5) stringResource(R.string.wash_great_day)
-        else if (uiState.weather != null) stringResource(R.string.wash_good_weather_but_cool)
-        else ""
+
+    val washRecommendation = when {
+        weatherConditionDesc.contains(stringResource(R.string.condition_rain).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_snow).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_thunderstorm).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_drizzle).lowercase(Locale.getDefault())) -> stringResource(R.string.wash_not_recommended)
+        weatherConditionDesc.contains(stringResource(R.string.condition_mist).lowercase(Locale.getDefault())) ||
+        weatherConditionDesc.contains(stringResource(R.string.condition_fog).lowercase(Locale.getDefault())) -> stringResource(R.string.wash_possible_limited_visibility)
+        uiState.weather != null && currentTempForWash != null && currentTempForWash > 5 -> stringResource(R.string.wash_great_day)
+        uiState.weather != null && currentTempForWash != null -> stringResource(R.string.wash_good_weather_but_cool)
+        else -> ""
     }
 
     if (uiState.showRecommendationDialog) {
@@ -139,7 +140,7 @@ fun WeatherScreenContent(
                                     .padding(vertical = 50.dp)
                             )
                             uiState.weather != null -> {
-                                WeatherDetails(weather = uiState.weather)
+                                WeatherDetails(weatherDetails = uiState.weather)
                                 Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_medium)))
                                 if (washRecommendation.isNotBlank()) {
                                     Text(
@@ -181,18 +182,7 @@ fun WeatherScreenContent(
             }
         }
 
-        if (!uiState.recommendations.isEmpty()) {
-            // *** НАЧАЛО БЛОКА ЛОГИРОВАНИЯ ДЛЯ РЕКОМЕНДАЦИЙ (ОБЩИЙ) ***
-            val currentContext = LocalContext.current
-            val currentLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                currentContext.resources.configuration.locales[0]
-            } else {
-                @Suppress("DEPRECATION")
-                currentContext.resources.configuration.locale
-            }
-            val appCompatLocaleTag = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-            Log.d("RecommendationLocale", "Preparing RecommendationsDisplaySection. ContextLocale: $currentLocale, AppCompatLocale: '$appCompatLocaleTag', NumRecommendations: ${uiState.recommendations.size}")
-            // *** КОНЕЦ БЛОКА ЛОГИРОВАНИЯ ***
+        if (uiState.recommendations.isNotEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -238,11 +228,11 @@ fun WeatherScreenContent(
                         textAlign = TextAlign.Center
                     )
                 }
-                !uiState.dailyForecasts.isEmpty() -> {
+                uiState.dailyForecasts.isNotEmpty() -> {
                     DailyForecastRow(forecastItems = uiState.dailyForecasts)
                 }
-                uiState.weather == null -> {
-                    Box(
+                uiState.weather == null && !uiState.isLoadingForecast && uiState.forecastErrorMessage == null -> {
+                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(dailyForecastRowHeight),

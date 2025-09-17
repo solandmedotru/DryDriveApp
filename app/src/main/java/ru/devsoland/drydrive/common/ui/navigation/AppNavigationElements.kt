@@ -1,10 +1,7 @@
 package ru.devsoland.drydrive.common.ui.navigation
 
-// import android.util.Log // Удалено
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
@@ -25,7 +21,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+// import androidx.compose.material3.ExposedDropdownMenuDefaults // Не используется явно, можно убрать если нет других применений
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +42,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext // Остается, используется в DryDriveTopAppBar
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
@@ -58,21 +53,19 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.devsoland.drydrive.R
-import ru.devsoland.drydrive.common.util.formatCityName
+// import ru.devsoland.drydrive.common.util.formatCityName // БОЛЬШЕ НЕ ИСПОЛЬЗУЕТСЯ ЗДЕСЬ
 import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent
 import ru.devsoland.drydrive.feature_weather.ui.WeatherUiState
+import ru.devsoland.drydrive.feature_weather.ui.model.CityDomainUiModel // ИМПОРТ ДЛЯ ЯВНОГО ТИПА
 import ru.devsoland.drydrive.ui.theme.SearchFieldBorderFocused
 import ru.devsoland.drydrive.ui.theme.SearchFieldBorderUnfocused
-// import androidx.appcompat.app.AppCompatDelegate // Удалено
-// import androidx.core.os.ConfigurationCompat // Удалено
-// import java.util.Locale // Удалено
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun DryDriveTopAppBar(
     uiState: WeatherUiState,
-    isSearchFieldVisible: Boolean, 
-    isSearchDropDownExpanded: Boolean, 
+    isSearchFieldVisible: Boolean,
+    isSearchDropDownExpanded: Boolean,
     onEvent: (WeatherEvent) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -84,7 +77,7 @@ fun DryDriveTopAppBar(
         title = {
             if (isSearchFieldVisible) {
                 ExposedDropdownMenuBox(
-                    expanded = isSearchDropDownExpanded && uiState.citySearchErrorMessage == null, 
+                    expanded = isSearchDropDownExpanded && uiState.citySearchErrorMessage == null,
                     onExpandedChange = {
                         if (!it) {
                             onEvent(WeatherEvent.DismissCitySearchDropDown)
@@ -108,7 +101,7 @@ fun DryDriveTopAppBar(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = if (uiState.citySearchErrorMessage != null) MaterialTheme.colorScheme.error else SearchFieldBorderFocused,
                             unfocusedBorderColor = if (uiState.citySearchErrorMessage != null) MaterialTheme.colorScheme.error else SearchFieldBorderUnfocused,
-                            focusedContainerColor = Color.Transparent, 
+                            focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
                             disabledContainerColor = Color.Transparent,
                             errorContainerColor = Color.Transparent,
@@ -144,12 +137,12 @@ fun DryDriveTopAppBar(
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                } 
+                                }
                             }
                         }
                     )
                     ExposedDropdownMenu(
-                        expanded = isSearchDropDownExpanded && uiState.citySearchErrorMessage == null, 
+                        expanded = isSearchDropDownExpanded && uiState.citySearchErrorMessage == null,
                         onDismissRequest = {
                             onEvent(WeatherEvent.DismissCitySearchDropDown)
                         },
@@ -159,18 +152,20 @@ fun DryDriveTopAppBar(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(dimensionResource(R.dimen.padding_medium)),
+                                    .padding(dimensionResource(R.dimen.spacing_large)),
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 CircularProgressIndicator()
                             }
                         } else if (uiState.cities.isNotEmpty()) {
-                            uiState.cities.forEach { city ->
-                                val formattedName = formatCityName(city, uiState.currentLanguageCode ?: "en")
+                            // uiState.cities теперь List<CityDomainUiModel>
+                            uiState.cities.forEach { city: CityDomainUiModel -> // Тип city теперь CityDomainUiModel
+                                // Используем city.displayName напрямую, он уже отформатирован
                                 DropdownMenuItem(
-                                    text = { Text(formattedName) },
+                                    text = { Text(city.displayName) }, // <--- ИЗМЕНЕНО
                                     onClick = {
-                                        onEvent(WeatherEvent.CitySelectedFromSearch(city, formattedName))
+                                        // WeatherEvent.CitySelectedFromSearch теперь ожидает только CityDomainUiModel
+                                        onEvent(WeatherEvent.CitySelectedFromSearch(city)) // <--- ИЗМЕНЕНО
                                     }
                                 )
                             }
@@ -182,7 +177,7 @@ fun DryDriveTopAppBar(
                         }
                     }
                 }
-                LaunchedEffect(isSearchFieldVisible) { 
+                LaunchedEffect(isSearchFieldVisible) {
                     if (isSearchFieldVisible) {
                         scope.launch {
                             delay(100)
@@ -191,10 +186,10 @@ fun DryDriveTopAppBar(
                         }
                     }
                 }
-            } else { 
-                val cityToDisplay = uiState.selectedCity?.let {
-                    formatCityName(it, uiState.currentLanguageCode ?: "en")
-                } ?: stringResource(R.string.select_city_prompt)
+            } else {
+                // uiState.selectedCity теперь CityDomainUiModel?
+                // Используем uiState.selectedCity.displayName напрямую
+                val cityToDisplay = uiState.selectedCity?.displayName ?: stringResource(R.string.select_city_prompt) // <--- ИЗМЕНЕНО
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -202,14 +197,14 @@ fun DryDriveTopAppBar(
                         .clickable {
                             onEvent(WeatherEvent.ShowSearchField)
                         }
-                        .padding(start = 0.dp)
+                        .padding(start = 0.dp) // Возможно, здесь нужен больший отступ слева для выравнивания с иконкой меню
                 ) {
                     Icon(
                         Icons.Filled.LocationOn,
                         contentDescription = stringResource(R.string.location_description),
                         modifier = Modifier.size(dimensionResource(R.dimen.icon_size_medium))
                     )
-                    Spacer(Modifier.width(dimensionResource(R.dimen.padding_small)))
+                    Spacer(Modifier.width(dimensionResource(R.dimen.spacing_medium)))
                     Text(
                         text = cityToDisplay,
                         style = MaterialTheme.typography.titleMedium,
@@ -232,12 +227,12 @@ fun DryDriveTopAppBar(
             }
         },
         actions = {
-            if (isSearchFieldVisible) { 
+            if (isSearchFieldVisible) {
                 IconButton(onClick = {
                     onEvent(WeatherEvent.HideSearchFieldAndDismissDropdown)
                 }) {
                     Icon(
-                        Icons.Filled.Place, 
+                        Icons.Filled.Place,
                         contentDescription = stringResource(R.string.hide_search_description),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
@@ -263,17 +258,17 @@ fun DryDriveTopAppBar(
 
 sealed class BottomNavItem(val route: String, val titleResId: Int, val icon: ImageVector) {
     object WeatherMain : BottomNavItem(
-        route = "weather_screen", 
+        route = "weather_screen",
         titleResId = R.string.nav_home,
         icon = Icons.Filled.Home
     )
     object Map : BottomNavItem(
-        route = "map_screen", 
-        titleResId = R.string.nav_map, 
-        icon = Icons.Filled.Place 
+        route = "map_screen",
+        titleResId = R.string.nav_map,
+        icon = Icons.Filled.Place
     )
     object Settings : BottomNavItem(
-        route = "settings_screen", 
+        route = "settings_screen",
         titleResId = R.string.nav_settings,
         icon = Icons.Filled.Settings
     )
@@ -291,14 +286,12 @@ fun DryDriveBottomNavigationBar(
     )
 
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface, 
-        contentColor = MaterialTheme.colorScheme.onSurface   
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         items.forEach { item ->
             val isSelected = currentRoute == item.route
             val resolvedString = stringResource(item.titleResId)
-
-            // Log.d("BottomNavLocale", "Item: ${item.route}, TitleResId: ${item.titleResId}, ResolvedString: '$resolvedString', ContextLocale: $currentLocale, AppCompatLocale: '$appCompatLocaleTag'") // Лог удален
 
             NavigationBarItem(
                 icon = {
@@ -310,7 +303,7 @@ fun DryDriveBottomNavigationBar(
                 label = { Text(resolvedString) },
                 selected = isSelected,
                 onClick = {
-                    if (!isSelected) { 
+                    if (!isSelected) {
                         onNavigate(item.route)
                     }
                 },
@@ -319,7 +312,7 @@ fun DryDriveBottomNavigationBar(
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer 
+                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer
                 )
             )
         }

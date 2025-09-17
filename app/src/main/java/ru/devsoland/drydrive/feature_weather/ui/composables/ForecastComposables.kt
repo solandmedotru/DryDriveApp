@@ -51,7 +51,7 @@ fun DailyForecastRow(
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_medium)),
-        contentPadding = PaddingValues(horizontal = dimensionResource(R.dimen.padding_medium))
+        contentPadding = PaddingValues(horizontal = dimensionResource(R.dimen.spacing_large))
     ) {
         items(
             items = forecastItems,
@@ -161,7 +161,7 @@ fun ForecastDayCard(
                     Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
                         DetailItem(
                             icon = Icons.Filled.Thermostat,
-                            label = stringResource(R.string.details_feels_like_short),
+                            label = stringResource(R.string.details_feels_like),
                             value = uiModel.feelsLike,
                             contentColor = cardContentColor,
                             modifier = Modifier.weight(1f)
@@ -169,7 +169,7 @@ fun ForecastDayCard(
                         Spacer(Modifier.width(dimensionResource(R.dimen.spacing_small))) // Небольшой разделитель между колонками
                         DetailItem(
                             icon = Icons.Filled.Opacity,
-                            label = stringResource(R.string.details_humidity_short),
+                            label = stringResource(R.string.details_humidity_label),
                             value = uiModel.humidity,
                             contentColor = cardContentColor,
                             modifier = Modifier.weight(1f)
@@ -179,7 +179,7 @@ fun ForecastDayCard(
                     Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
                         DetailItem(
                             icon = Icons.Filled.Air,
-                            label = stringResource(R.string.details_wind_label_short),
+                            label = stringResource(R.string.details_wind_label),
                             value = uiModel.windInfo,
                             contentColor = cardContentColor,
                             modifier = Modifier.weight(1f)
@@ -187,7 +187,7 @@ fun ForecastDayCard(
                         Spacer(Modifier.width(dimensionResource(R.dimen.spacing_small)))
                         DetailItem(
                             icon = Icons.Filled.Compress,
-                            label = stringResource(R.string.details_pressure_label_short),
+                            label = stringResource(R.string.details_pressure_label),
                             value = uiModel.pressure,
                             contentColor = cardContentColor,
                             modifier = Modifier.weight(1f)
@@ -197,7 +197,7 @@ fun ForecastDayCard(
                     Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
                         DetailItem(
                             icon = Icons.Filled.Visibility,
-                            label = stringResource(R.string.details_visibility_label_short),
+                            label = stringResource(R.string.details_visibility_label),
                             value = uiModel.visibility,
                             contentColor = cardContentColor,
                             modifier = Modifier.weight(1f)
@@ -205,7 +205,7 @@ fun ForecastDayCard(
                         Spacer(Modifier.width(dimensionResource(R.dimen.spacing_small)))
                         DetailItem(
                             icon = Icons.Filled.Cloud,
-                            label = stringResource(R.string.details_clouds_short),
+                            label = stringResource(R.string.details_clouds_label),
                             value = uiModel.clouds,
                             contentColor = cardContentColor,
                             modifier = Modifier.weight(1f)
@@ -215,7 +215,7 @@ fun ForecastDayCard(
                      Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
                          DetailItem(
                             icon = Icons.Filled.Grain,
-                            label = stringResource(R.string.details_precipitation_short),
+                            label = stringResource(R.string.details_precipitation),
                             value = uiModel.precipitationProbability,
                             contentColor = cardContentColor,
                             modifier = Modifier.weight(1f)

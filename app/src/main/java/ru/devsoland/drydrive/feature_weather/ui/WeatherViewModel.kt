@@ -3,55 +3,46 @@ package ru.devsoland.drydrive.feature_weather.ui
 import android.app.Application
 import android.util.Log
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessibilityNew
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.LocalDrink
-import androidx.compose.material.icons.filled.Thermostat
-import androidx.compose.material.icons.filled.Umbrella
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.* // Keep wildcard for other operators like debounce, collectLatest, etc.
+import kotlinx.coroutines.flow.first // <--- ADDED EXPLICIT IMPORT
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import ru.devsoland.drydrive.BuildConfig
 import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.common.model.ThemeSetting
-import ru.devsoland.drydrive.data.WeatherApi
-import ru.devsoland.drydrive.data.api.model.City
 import ru.devsoland.drydrive.data.api.model.ForecastListItem
 import ru.devsoland.drydrive.data.api.model.ForecastResponse
-import ru.devsoland.drydrive.data.api.model.Weather
+import ru.devsoland.drydrive.data.WeatherApi // ВРЕМЕННО для getFiveDayForecast
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
+import ru.devsoland.drydrive.domain.model.CityDomain
+import ru.devsoland.drydrive.domain.model.Result
+import ru.devsoland.drydrive.domain.usecase.GetCurrentWeatherUseCase
+import ru.devsoland.drydrive.domain.usecase.SearchCitiesUseCase
 import ru.devsoland.drydrive.feature_weather.mapper.toForecastCardUiModel
+import ru.devsoland.drydrive.feature_weather.ui.mapper.toUiModel // Наши UI мапперы (Domain -> UI)
+import ru.devsoland.drydrive.feature_weather.ui.model.CityDomainUiModel
 import ru.devsoland.drydrive.feature_weather.ui.model.ForecastCardUiModel
-import ru.devsoland.drydrive.feature_weather.ui.util.getWeatherIconResource
+import ru.devsoland.drydrive.feature_weather.ui.model.WeatherDetailsUiModel
 import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent.Recommendation
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import ru.devsoland.drydrive.BuildConfig
 
 data class WeatherUiState(
     val isLoadingCities: Boolean = false,
     val isLoadingWeather: Boolean = false,
     val isLoadingForecast: Boolean = false,
     val isInitialLoading: Boolean = true,
-    val cities: List<City> = emptyList(),
-    val selectedCity: City? = null,
-    val weather: Weather? = null,
+    val cities: List<CityDomainUiModel> = emptyList(),
+    val selectedCity: CityDomainUiModel? = null,
+    val weather: WeatherDetailsUiModel? = null,
     val dailyForecasts: List<ForecastCardUiModel> = emptyList(),
     val recommendations: List<Recommendation> = emptyList(),
     val citySearchQuery: String = "",
@@ -67,13 +58,15 @@ data class WeatherUiState(
 
 @HiltViewModel
 class WeatherViewModel @Inject constructor(
-    private val weatherApi: WeatherApi,
+    private val getCurrentWeatherUseCase: GetCurrentWeatherUseCase,
+    private val searchCitiesUseCase: SearchCitiesUseCase,
     private val userPreferencesManager: UserPreferencesManager,
-    private val application: Application
+    private val application: Application,
+    private val weatherApi: WeatherApi // ВРЕМЕННО, пока не рефакторен UseCase для прогноза
 ) : AndroidViewModel(application) {
 
-    private val apiKey: String = BuildConfig.WEATHER_API_KEY
     private val tag = "WeatherViewModel"
+    private val apiKey: String = BuildConfig.WEATHER_API_KEY
 
     private val _uiState = MutableStateFlow(WeatherUiState())
     val uiState: StateFlow<WeatherUiState> = _uiState.asStateFlow()
@@ -84,7 +77,7 @@ class WeatherViewModel @Inject constructor(
     private val searchQueryFlow = MutableStateFlow("")
 
     init {
-        Log.d(tag, "ViewModel initialized. API Key: $apiKey")
+        Log.d(tag, "ViewModel initialized.")
         loadInitialData()
         observeLanguageChanges()
         observeThemeChanges()
@@ -97,40 +90,43 @@ class WeatherViewModel @Inject constructor(
                 .debounce(700L)
                 .collectLatest { debouncedQuery ->
                     if (debouncedQuery.length >= 2) {
-                        performApiSearch(debouncedQuery)
+                        performCitySearch(debouncedQuery)
                     } else {
-                        _uiState.update {
-                            it.copy(
-                                isLoadingCities = false,
-                                cities = emptyList()
-                            )
+                        if (debouncedQuery.isNotEmpty()) {
+                            _uiState.update {
+                                it.copy(isLoadingCities = false, cities = emptyList(), citySearchErrorMessage = application.getString(R.string.city_search_too_short))
+                            }
+                        } else {
+                            _uiState.update {
+                                it.copy(isLoadingCities = false, cities = emptyList(), citySearchErrorMessage = null)
+                            }
                         }
                     }
                 }
         }
     }
 
-    private suspend fun performApiSearch(query: String) {
+    private suspend fun performCitySearch(query: String) {
         _uiState.update { it.copy(isLoadingCities = true, citySearchErrorMessage = null) }
-        try {
-            val citiesResult = withContext(Dispatchers.IO) {
-                weatherApi.searchCities(query = query, limit = 5, apiKey = apiKey)
+        val langCodeForSearch = _uiState.value.currentLanguageCode ?: Locale.getDefault().language
+        when (val result = searchCitiesUseCase(query = query)) {
+            is Result.Success -> {
+                _uiState.update {
+                    it.copy(
+                        cities = result.data.toUiModel(langCodeForSearch), // result.data is List<CityDomain>
+                        isLoadingCities = false,
+                        citySearchErrorMessage = if (result.data.isEmpty()) application.getString(R.string.city_search_no_results) else null
+                    )
+                }
             }
-            _uiState.update {
-                it.copy(
-                    cities = citiesResult,
-                    isLoadingCities = false,
-                    citySearchErrorMessage = if (citiesResult.isEmpty()) application.getString(R.string.city_search_no_results) else null
-                )
-            }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            Log.e(tag, "API city search FAILED for query: '$query'. Error: ${e.message}", e)
-            _uiState.update {
-                it.copy(
-                    isLoadingCities = false,
-                    citySearchErrorMessage = application.getString(R.string.city_search_error)
-                )
+            is Result.Error -> {
+                Log.e(tag, "City search FAILED for query: '$query'. Error: ${result.message}", result.exception)
+                _uiState.update {
+                    it.copy(
+                        isLoadingCities = false,
+                        citySearchErrorMessage = result.message ?: application.getString(R.string.city_search_error)
+                    )
+                }
             }
         }
     }
@@ -138,21 +134,24 @@ class WeatherViewModel @Inject constructor(
     private fun loadInitialData() {
         viewModelScope.launch {
             try {
-                val lastCity: City? = userPreferencesManager.lastSelectedCityFlow.first()
+                val lastCityDomain: CityDomain? = userPreferencesManager.lastSelectedCityFlow.first()
                 val currentLang: AppLanguage = userPreferencesManager.selectedLanguageFlow.first()
                 val currentLangCode: String = currentLang.code
                 val resolvedCurrentTheme: ThemeSetting = userPreferencesManager.selectedThemeFlow.first()
-                Log.d(tag, "Initial data: City=${lastCity?.name}, Lang=$currentLangCode, Theme=$resolvedCurrentTheme")
+
+                val lastCityUiModel: CityDomainUiModel? = lastCityDomain?.toUiModel(currentLangCode)
+
+                Log.d(tag, "Initial data: City=${lastCityUiModel?.displayName}, Lang=$currentLangCode, Theme=$resolvedCurrentTheme")
 
                 _uiState.update {
                     it.copy(
-                        selectedCity = lastCity,
+                        selectedCity = lastCityUiModel,
                         currentLanguageCode = currentLangCode,
                         currentTheme = resolvedCurrentTheme
                     )
                 }
-                if (lastCity != null) {
-                    fetchCurrentWeatherAndForecast(lastCity, currentLangCode)
+                if (lastCityUiModel != null) {
+                    fetchCurrentWeatherAndForecast(lastCityUiModel, currentLangCode)
                 } else {
                     _uiState.update { it.copy(isInitialLoading = false) }
                 }
@@ -165,32 +164,47 @@ class WeatherViewModel @Inject constructor(
 
     private fun observeLanguageChanges() {
         viewModelScope.launch {
-            try {
-                userPreferencesManager.selectedLanguageFlow.collect { appLang ->
-                    val langCode = appLang.code
-                    val currentState = _uiState.value
-                    if (currentState.currentLanguageCode != langCode) {
-                        Log.d(tag, "Language changed to: $langCode. Current state lang: ${currentState.currentLanguageCode}.")
-                        _uiState.update { it.copy(currentLanguageCode = langCode) }
-                        currentState.selectedCity?.let { city -> 
-                            fetchCurrentWeatherAndForecast(city, langCode)
-                        }
-                    } 
+            userPreferencesManager.selectedLanguageFlow.collect { appLang ->
+                val newLangCode = appLang.code
+                val currentState = _uiState.value // Получаем текущее состояние один раз
+
+                if (currentState.currentLanguageCode != newLangCode) {
+                    Log.d(tag, "Language changed to: $newLangCode.")
+                    // Обновляем UiState с новым кодом языка
+                    _uiState.update { it.copy(currentLanguageCode = newLangCode) }
+
+                    // Если есть выбранный город, обновляем его displayName и перезапрашиваем погоду
+                    currentState.selectedCity?.let { currentSelectedCityUiModel ->
+                        // Воссоздаем CityDomain из текущей CityDomainUiModel
+                        val cityDomain = CityDomain(
+                            name = currentSelectedCityUiModel.originalNameFromApi ?: currentSelectedCityUiModel.displayName,
+                            lat = currentSelectedCityUiModel.lat,
+                            lon = currentSelectedCityUiModel.lon,
+                            country = currentSelectedCityUiModel.country,
+                            state = currentSelectedCityUiModel.state,
+                            localNames = currentSelectedCityUiModel.allLocalNames
+                        )
+                        // Маппим CityDomain в CityDomainUiModel с новым языком
+                        val updatedSelectedCityUiModel = cityDomain.toUiModel(newLangCode)
+
+                        // Обновляем selectedCity в UiState и запрашиваем погоду
+                        _uiState.update { it.copy(selectedCity = updatedSelectedCityUiModel) }
+                        fetchCurrentWeatherAndForecast(updatedSelectedCityUiModel, newLangCode)
+                    }
+
+                    // Очищаем список результатов поиска, так как язык изменился
+                    if (currentState.cities.isNotEmpty()) {
+                        _uiState.update { it.copy(cities = emptyList()) }
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(tag, "[observeLanguageChanges] FAILED: ${e.message}", e)
             }
         }
     }
 
     private fun observeThemeChanges() {
         viewModelScope.launch {
-            try {
-                userPreferencesManager.selectedThemeFlow.collect { theme ->
-                    _uiState.update { it.copy(currentTheme = theme) }
-                }
-            } catch (e: Exception) {
-                Log.e(tag, "[observeThemeChanges] FAILED: ${e.message}", e)
+            userPreferencesManager.selectedThemeFlow.collect { theme ->
+                _uiState.update { it.copy(currentTheme = theme) }
             }
         }
     }
@@ -200,7 +214,7 @@ class WeatherViewModel @Inject constructor(
         when (event) {
             is WeatherEvent.SearchQueryChanged -> {
                 val query = event.query
-                _uiState.update { it.copy(citySearchQuery = query) } 
+                _uiState.update { it.copy(citySearchQuery = query) }
                 if (query.isEmpty()) {
                     _uiState.update { it.copy(cities = emptyList(), isLoadingCities = false, citySearchErrorMessage = null) }
                 } else if (query.length < 2) {
@@ -215,13 +229,8 @@ class WeatherViewModel @Inject constructor(
             }
             is WeatherEvent.ChangeLanguage -> {
                 viewModelScope.launch {
-                    try {
-                        userPreferencesManager.saveSelectedLanguage(event.language)
-                        val sendResult = _recreateActivityEvent.trySend(Unit)
-                        Log.d(tag, "Requesting activity recreate for language change. Result: $sendResult")
-                    } catch (e: Exception) {
-                        Log.e(tag, "ChangeLanguage event FAILED: ${e.message}", e)
-                    }
+                    userPreferencesManager.saveSelectedLanguage(event.language)
+                    _recreateActivityEvent.trySend(Unit)
                 }
             }
             is WeatherEvent.DismissCitySearchDropDown -> {
@@ -232,64 +241,56 @@ class WeatherViewModel @Inject constructor(
                     fetchCurrentWeatherAndForecast(it, uiState.value.currentLanguageCode)
                 }
             }
-            is WeatherEvent.ClearWeatherErrorMessage -> {
+             is WeatherEvent.ClearWeatherErrorMessage -> {
                 _uiState.update { it.copy(weatherErrorMessage = null, forecastErrorMessage = null) }
             }
             is WeatherEvent.RecommendationClicked -> {
-                _uiState.update {
-                    it.copy(
-                        showRecommendationDialog = true,
-                        recommendationDialogTitleResId = event.recommendation.textResId,
-                        recommendationDialogDescriptionResId = event.recommendation.descriptionResId
-                    )
-                }
+                 _uiState.update { it.copy(showRecommendationDialog = true, recommendationDialogTitleResId = event.recommendation.textResId, recommendationDialogDescriptionResId = event.recommendation.descriptionResId) }
             }
             is WeatherEvent.DismissRecommendationDialog -> {
-                _uiState.update { it.copy(showRecommendationDialog = false, recommendationDialogTitleResId = null, recommendationDialogDescriptionResId = null) }
+                _uiState.update { it.copy(showRecommendationDialog = false) }
             }
-            is WeatherEvent.ShowSearchField -> { /* UI handles this */ }
             is WeatherEvent.HideSearchFieldAndDismissDropdown -> {
                  _uiState.update { it.copy(cities = emptyList(), citySearchQuery = "", citySearchErrorMessage = null) }
-                 searchQueryFlow.value = "" 
+                 searchQueryFlow.value = ""
             }
-            is WeatherEvent.BottomNavItemSelected -> { /* UI handles this */ }
+            else -> { }
         }
     }
 
-    private fun onCitySelected(city: City) {
+    private fun onCitySelected(cityUiModel: CityDomainUiModel) {
         val currentLangCode = _uiState.value.currentLanguageCode
-        Log.d(tag, "City selected: ${city.name}. Lang: $currentLangCode")
+        Log.d(tag, "City selected: ${cityUiModel.displayName}. Lang: $currentLangCode")
         _uiState.update {
             it.copy(
-                selectedCity = city,
+                selectedCity = cityUiModel,
                 cities = emptyList(),
                 citySearchQuery = "",
-                isInitialLoading = false, 
+                isInitialLoading = false,
                 citySearchErrorMessage = null
             )
         }
-        searchQueryFlow.value = "" 
-        fetchCurrentWeatherAndForecast(city, currentLangCode)
+        searchQueryFlow.value = ""
+        fetchCurrentWeatherAndForecast(cityUiModel, currentLangCode)
         viewModelScope.launch {
-            try {
-                userPreferencesManager.saveLastSelectedCity(city)
-            } catch (e: Exception) {
-                Log.e(tag, "Failed to save last selected city ${city.name}. Error: ${e.message}", e)
-            }
+            val cityDomainToSave = CityDomain(
+                name = cityUiModel.originalNameFromApi ?: cityUiModel.displayName,
+                lat = cityUiModel.lat,
+                lon = cityUiModel.lon,
+                country = cityUiModel.country,
+                state = cityUiModel.state,
+                localNames = cityUiModel.allLocalNames
+            )
+            userPreferencesManager.saveLastSelectedCity(cityDomainToSave)
         }
     }
 
     private suspend fun getApiLangCode(): String {
-        return try {
-            userPreferencesManager.selectedLanguageFlow.first().code
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to get lang code from prefs. Error: ${e.message}. Falling back to default.", e)
-            Locale.getDefault().language
-        }
+        return _uiState.value.currentLanguageCode ?: userPreferencesManager.selectedLanguageFlow.first().code
     }
 
-    private fun fetchCurrentWeatherAndForecast(city: City, explicitApiLang: String?) {
-        Log.d(tag, "Fetching weather/forecast for ${city.name}. Lang: $explicitApiLang")
+    private fun fetchCurrentWeatherAndForecast(city: CityDomainUiModel, explicitApiLang: String?) {
+        Log.d(tag, "Fetching weather/forecast for ${city.displayName}. Lang: $explicitApiLang")
         viewModelScope.launch {
             val apiLang = explicitApiLang ?: getApiLangCode()
             _uiState.update {
@@ -297,44 +298,46 @@ class WeatherViewModel @Inject constructor(
             }
 
             var weatherFetchError: String? = null
-            var forecastFetchError: String? = null
-            var fetchedWeather: Weather? = null
-            var processedForecasts: List<ForecastCardUiModel> = emptyList()
+            var fetchedWeatherUiModel: WeatherDetailsUiModel? = null
 
-            try {
-                fetchedWeather = withContext(Dispatchers.IO) {
-                    weatherApi.getWeather(city = city.name, apiKey = apiKey, lang = apiLang)
+            when (val weatherResult = getCurrentWeatherUseCase(cityName = city.originalNameFromApi ?: city.displayName, lat = city.lat, lon = city.lon, lang = apiLang)) {
+                is Result.Success -> {
+                    fetchedWeatherUiModel = weatherResult.data.toUiModel(application.applicationContext)
                 }
-            } catch (e: Exception) {
-                Log.e(tag, "Failed to fetch current weather for ${city.name}. Error: ${e.message}", e)
-                weatherFetchError = if (e.message?.contains("401") == true) {
-                    application.applicationContext.getString(R.string.error_api_key_invalid)
-                } else if (e.message?.contains("404") == true || e.message?.contains("city not found") == true) {
-                    application.applicationContext.getString(R.string.city_not_found)
-                } else {
-                    application.applicationContext.getString(R.string.error_loading_weather)
+                is Result.Error -> {
+                    Log.e(tag, "Failed to fetch current weather for ${city.displayName}. Error: ${weatherResult.message}", weatherResult.exception)
+                    weatherFetchError = weatherResult.message ?: application.getString(R.string.error_loading_weather)
+                    if (weatherResult.message?.contains("401", ignoreCase = true) ?: false) {
+                        weatherFetchError = application.getString(R.string.error_api_key_invalid)
+                    } else if ((weatherResult.message?.contains("404", ignoreCase = true) ?: false) ||
+                               (weatherResult.message?.contains("city not found", ignoreCase = true) ?: false)) {
+                        weatherFetchError = application.getString(R.string.city_not_found)
+                    }
                 }
             }
 
+            var forecastFetchError: String? = null
+            var processedForecasts: List<ForecastCardUiModel> = emptyList()
             if (city.lat != 0.0 && city.lon != 0.0) {
                 try {
-                    val forecastResponse = withContext(Dispatchers.IO) {
+                    val forecastResponse = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                          weatherApi.getFiveDayForecast(lat = city.lat, lon = city.lon, apiKey = apiKey, lang = apiLang)
                     }
-                    processedForecasts = processForecastResponse(forecastResponse, fetchedWeather?.dt ?: (System.currentTimeMillis() / 1000))
+                    val currentDtForForecast = fetchedWeatherUiModel?.dt ?: (System.currentTimeMillis() / 1000L)
+                    processedForecasts = processForecastResponse(forecastResponse, currentDtForForecast)
                 } catch (e: Exception) {
-                    Log.e(tag, "Failed to fetch/process forecast for ${city.name}. Error: ${e.message}", e)
+                    Log.e(tag, "Failed to fetch/process forecast for ${city.displayName}. Error: ${e.message}", e)
                     forecastFetchError = application.applicationContext.getString(R.string.error_loading_weather)
                 }
             } else {
-                Log.w(tag, "Skipping forecast: Invalid Lat/Lon for ${city.name}.")
+                Log.w(tag, "Skipping forecast: Invalid Lat/Lon for ${city.displayName}.")
             }
 
-            val currentRecommendations = generateRecommendations(fetchedWeather, processedForecasts)
+            val currentRecommendations = generateRecommendations(fetchedWeatherUiModel, processedForecasts)
 
             _uiState.update {
                 it.copy(
-                    weather = fetchedWeather ?: it.weather,
+                    weather = fetchedWeatherUiModel ?: it.weather,
                     dailyForecasts = processedForecasts,
                     isLoadingWeather = false,
                     isLoadingForecast = false,
@@ -379,123 +382,59 @@ class WeatherViewModel @Inject constructor(
             .sortedBy { it.key }
             .take(5)
             .forEach { entry ->
-                val targetItem = entry.value.find { it.dtTxt.substring(11, 13) == "12" }
-                    ?: entry.value.firstOrNull()
-
-                targetItem?.let { item ->
-                    val itemDateForHighlight = todaySdf.format(Date(item.dt * 1000L))
+                val targetItem = entry.value.find { it.dtTxt.substring(11, 13) == "12" } ?: entry.value.firstOrNull()
+                targetItem?.let {
+                    val itemDateForHighlight = todaySdf.format(Date(it.dt * 1000L))
                     val isHighlighted = itemDateForHighlight == todayKeyForHighlight
+
                     forecastCardUiModels.add(
-                        item.toForecastCardUiModel(
-                            context = application.applicationContext,
-                            isHighlighted = isHighlighted
-                        )
+                        it.toForecastCardUiModel(context = application.applicationContext, isHighlighted = isHighlighted)
                     )
                 }
             }
         return forecastCardUiModels
     }
 
-    private fun generateRecommendations(weatherData: Weather?, forecastData: List<ForecastCardUiModel>?): List<Recommendation> { 
-        val recommendations = mutableListOf<Recommendation>() 
-        if (weatherData == null) return emptyList() 
-        val currentTemp = weatherData.main.temp
+    private fun generateRecommendations(weatherData: WeatherDetailsUiModel?, forecastData: List<ForecastCardUiModel>?): List<Recommendation> {
+        val recommendations = mutableListOf<Recommendation>()
+        if (weatherData == null) return emptyList()
+
+        val currentTempString = weatherData.temperature.filter { it.isDigit() || it == '-' }
+        val currentTemp = currentTempString.toDoubleOrNull() ?: 20.0
 
         val isHot = currentTemp > 25.0
-        recommendations.add(
-            Recommendation(
-                id = "drink_water",
-                textResId = if (isHot) R.string.rec_drink_water_active else R.string.rec_drink_water_default,
-                descriptionResId = if (isHot) R.string.rec_drink_water_desc_active else R.string.rec_drink_water_desc_default,
-                icon = Icons.Filled.LocalDrink,
-                isActive = isHot,
-                activeColor = Color(0xFF4FC3F7),
-                activeAlpha = 1.0f,
-                inactiveAlpha = 0.6f
-            )
-        )
+        recommendations.add(Recommendation(id = "drink_water", textResId = if (isHot) R.string.rec_drink_water_active else R.string.rec_drink_water_default, descriptionResId = if (isHot) R.string.rec_drink_water_desc_active else R.string.rec_drink_water_desc_default, icon = Icons.Filled.LocalDrink, isActive = isHot, activeColor = Color(0xFF4FC3F7), activeAlpha = 1.0f, inactiveAlpha = 0.6f))
 
-        val weatherCondition = weatherData.weather.firstOrNull()
-        val iconCode = weatherCondition?.icon
-        val isSunnyOrFewCloudsDay = when (iconCode) { "01d", "02d" -> true else -> false }
+        val isSunnyOrFewCloudsDay = weatherData.weatherConditionDescription.contains("ясно", ignoreCase = true) || weatherData.weatherConditionDescription.contains("малооблачно", ignoreCase = true)
         val isWarmEnoughForUvConcern = currentTemp > 15.0
         val isUvActive = isSunnyOrFewCloudsDay && isWarmEnoughForUvConcern
-        recommendations.add(
-            Recommendation(
-                id = "high_uv",
-                textResId = if (isUvActive) R.string.rec_uv_protection_active else R.string.rec_uv_protection_default,
-                descriptionResId = if (isUvActive) R.string.rec_uv_protection_desc_active else R.string.rec_uv_protection_desc_default,
-                icon = Icons.Filled.WbSunny,
-                isActive = isUvActive,
-                activeColor = Color(0xFFFFD54F),
-                activeAlpha = 1.0f,
-                inactiveAlpha = 0.6f
-            )
-        )
+        recommendations.add(Recommendation(id = "high_uv", textResId = if (isUvActive) R.string.rec_uv_protection_active else R.string.rec_uv_protection_default, descriptionResId = if (isUvActive) R.string.rec_uv_protection_desc_active else R.string.rec_uv_protection_desc_default, icon = Icons.Filled.WbSunny, isActive = isUvActive, activeColor = Color(0xFFFFD54F), activeAlpha = 1.0f, inactiveAlpha = 0.6f))
 
         val isColdForTires = currentTemp < 3.0
-        recommendations.add(
-            Recommendation(
-                id = "check_tires",
-                textResId = if (isColdForTires) R.string.rec_tire_change_active else R.string.rec_tire_change_default,
-                descriptionResId = if (isColdForTires) R.string.rec_tire_change_desc_active else R.string.rec_tire_change_desc_default,
-                icon = Icons.Filled.DirectionsCar,
-                isActive = isColdForTires,
-                activeColor = Color(0xFF81D4FA),
-                activeAlpha = 1.0f,
-                inactiveAlpha = 0.6f
-            )
-        )
+        recommendations.add(Recommendation(id = "check_tires", textResId = if (isColdForTires) R.string.rec_tire_change_active else R.string.rec_tire_change_default, descriptionResId = if (isColdForTires) R.string.rec_tire_change_desc_active else R.string.rec_tire_change_desc_default, icon = Icons.Filled.DirectionsCar, isActive = isColdForTires, activeColor = Color(0xFF81D4FA), activeAlpha = 1.0f, inactiveAlpha = 0.6f))
 
-        val isRainingNow = weatherData.weather.any { it.main.contains("Rain", ignoreCase = true) }
+        // Используем application.getString для доступа к ресурсам строк
+        val rainCondition = application.getString(R.string.condition_rain).lowercase(Locale.getDefault())
+        val snowCondition = application.getString(R.string.condition_snow).lowercase(Locale.getDefault())
 
+        val isRainingNow = weatherData.weatherConditionDescription.lowercase(Locale.getDefault()).contains(rainCondition, ignoreCase = false)
         val willRainSoon = forecastData?.take(2)?.any { dailyWeatherUiModel ->
-            val forecastIconCode = dailyWeatherUiModel.iconCodeApi // *** ИЗМЕНЕНО ЗДЕСЬ ***
+            val forecastIconCode = dailyWeatherUiModel.iconCodeApi
             forecastIconCode?.startsWith("10") == true || forecastIconCode?.startsWith("09") == true
         } ?: false
         val isUmbrellaNeeded = isRainingNow || willRainSoon
-        recommendations.add(
-            Recommendation(
-                id = "take_umbrella",
-                textResId = if (isUmbrellaNeeded) R.string.rec_umbrella_active else R.string.rec_umbrella_default,
-                descriptionResId = if (isUmbrellaNeeded) R.string.rec_umbrella_desc_active else R.string.rec_umbrella_desc_default,
-                icon = Icons.Filled.Umbrella,
-                isActive = isUmbrellaNeeded,
-                activeColor = Color(0xFFFFB74D),
-                activeAlpha = 1.0f,
-                inactiveAlpha = 0.6f
-            )
-        )
+        recommendations.add(Recommendation(id = "take_umbrella", textResId = if (isUmbrellaNeeded) R.string.rec_umbrella_active else R.string.rec_umbrella_default, descriptionResId = if (isUmbrellaNeeded) R.string.rec_umbrella_desc_active else R.string.rec_umbrella_desc_default, icon = Icons.Filled.Umbrella, isActive = isUmbrellaNeeded, activeColor = Color(0xFFFFB74D), activeAlpha = 1.0f, inactiveAlpha = 0.6f))
+
         val needsWarmClothes = currentTemp < 10.0
-        recommendations.add(
-            Recommendation(
-                id = "dress_warmly",
-                textResId = if (needsWarmClothes) R.string.rec_dress_warmly_active else R.string.rec_dress_warmly_default,
-                descriptionResId = if (needsWarmClothes) R.string.rec_dress_warmly_desc_active else R.string.rec_dress_warmly_desc_default,
-                icon = Icons.Filled.Thermostat,
-                isActive = needsWarmClothes,
-                activeColor = Color(0xFFB0BEC5),
-                activeAlpha = 1.0f,
-                inactiveAlpha = 0.6f
-            )
-        )
+        recommendations.add(Recommendation(id = "dress_warmly", textResId = if (needsWarmClothes) R.string.rec_dress_warmly_active else R.string.rec_dress_warmly_default, descriptionResId = if (needsWarmClothes) R.string.rec_dress_warmly_desc_active else R.string.rec_dress_warmly_desc_default, icon = Icons.Filled.Thermostat, isActive = needsWarmClothes, activeColor = Color(0xFFB0BEC5), activeAlpha = 1.0f, inactiveAlpha = 0.6f))
 
         val isVeryHot = currentTemp > 35.0
         val isVeryCold = currentTemp < -15.0
-        val isBadWeather = weatherData.weather.any { it.main.contains("Storm", ignoreCase = true) || it.main.contains("Snow", ignoreCase = true) && currentTemp < 0 }
+        val isBadWeather = weatherData.weatherConditionDescription.contains("шторм", ignoreCase = true) ||
+                           (weatherData.weatherConditionDescription.lowercase(Locale.getDefault()).contains(snowCondition, ignoreCase = false) && currentTemp < 0)
         val limitActivity = isVeryHot || isVeryCold || isBadWeather
-        recommendations.add(
-            Recommendation(
-                id = "limit_activity",
-                textResId = if (limitActivity) R.string.rec_limit_activity_active else R.string.rec_limit_activity_default,
-                descriptionResId = if (limitActivity) R.string.rec_limit_activity_desc_active else R.string.rec_limit_activity_desc_default,
-                icon = Icons.Filled.AccessibilityNew,
-                isActive = limitActivity,
-                activeColor = Color(0xFFEF5350),
-                activeAlpha = 1.0f,
-                inactiveAlpha = 0.6f
-            )
-        )
+        recommendations.add(Recommendation(id = "limit_activity", textResId = if (limitActivity) R.string.rec_limit_activity_active else R.string.rec_limit_activity_default, descriptionResId = if (limitActivity) R.string.rec_limit_activity_desc_active else R.string.rec_limit_activity_desc_default, icon = Icons.Filled.AccessibilityNew, isActive = limitActivity, activeColor = Color(0xFFEF5350), activeAlpha = 1.0f, inactiveAlpha = 0.6f))
+
         return recommendations
     }
 }

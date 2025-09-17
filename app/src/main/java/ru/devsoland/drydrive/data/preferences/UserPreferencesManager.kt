@@ -2,7 +2,6 @@ package ru.devsoland.drydrive.data.preferences
 
 import android.content.Context
 import android.util.Log
-import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -11,30 +10,28 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import ru.devsoland.drydrive.common.model.AppLanguage
-import ru.devsoland.drydrive.common.model.ThemeSetting // Добавлен импорт
-import ru.devsoland.drydrive.data.api.model.City
+import ru.devsoland.drydrive.common.model.ThemeSetting
+import ru.devsoland.drydrive.domain.model.CityDomain // <--- Убеждаемся, что это CityDomain
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
-
 
 private val Context.appPreferencesDataStore by preferencesDataStore(name = "user_settings_drydrive")
 
 object UserPreferenceKeys {
     val SELECTED_LANGUAGE_CODE = stringPreferencesKey("selected_language_code")
-    val SELECTED_THEME = stringPreferencesKey("selected_theme") // Ключ для темы
-
-    // Новые ключи для города
-    val LAST_CITY_NAME = stringPreferencesKey("last_city_name")
-    val LAST_CITY_LAT = doublePreferencesKey("last_city_lat")
-    val LAST_CITY_LON = doublePreferencesKey("last_city_lon")
-    val LAST_CITY_COUNTRY = stringPreferencesKey("last_city_country")
-    val LAST_CITY_STATE = stringPreferencesKey("last_city_state")
+    val SELECTED_THEME = stringPreferencesKey("selected_theme")
+    val LAST_SELECTED_CITY_JSON = stringPreferencesKey("last_selected_city_json") // Ключ для JSON строки CityDomain
 }
 
 @Singleton
-class UserPreferencesManager @Inject constructor(@ApplicationContext private val context: Context) {
+class UserPreferencesManager @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private val json: Json = Json { ignoreUnknownKeys = true; prettyPrint = false } // prettyPrint можно убрать для продакшена
 
     // --- Языковые настройки ---
     val selectedLanguageFlow: Flow<AppLanguage> = context.appPreferencesDataStore.data
@@ -44,22 +41,16 @@ class UserPreferencesManager @Inject constructor(@ApplicationContext private val
         }
         .map { preferences ->
             val languageCode = preferences[UserPreferenceKeys.SELECTED_LANGUAGE_CODE]
-            Log.d("UserPrefsManager", "Read language code: '$languageCode'")
-            val selectedLang = AppLanguage.fromCode(languageCode)
-            Log.d("UserPrefsManager", "Mapped to AppLanguage: ${selectedLang.name} (code: '${selectedLang.code}')")
-            selectedLang
+            AppLanguage.fromCode(languageCode)
         }
 
     suspend fun saveSelectedLanguage(language: AppLanguage) {
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 preferences[UserPreferenceKeys.SELECTED_LANGUAGE_CODE] = language.code
-                Log.d("UserPrefsManager", "Saved language code: '${language.code}' for ${language.name}")
             }
-        } catch (e: IOException) {
-            Log.e("UserPrefsManager", "IOException while saving language.", e)
         } catch (e: Exception) {
-            Log.e("UserPrefsManager", "Unexpected error saving language.", e)
+            Log.e("UserPrefsManager", "Error saving language: ${language.code}", e)
         }
     }
 
@@ -71,11 +62,10 @@ class UserPreferencesManager @Inject constructor(@ApplicationContext private val
         }
         .map { preferences ->
             val themeName = preferences[UserPreferenceKeys.SELECTED_THEME]
-            Log.d("UserPrefsManager", "Read theme name: '$themeName'")
             try {
                 if (themeName != null) ThemeSetting.valueOf(themeName) else ThemeSetting.SYSTEM
             } catch (e: IllegalArgumentException) {
-                Log.w("UserPrefsManager", "Invalid theme name '$themeName' in preferences, defaulting to SYSTEM.")
+                Log.w("UserPrefsManager", "Invalid theme name '$themeName', defaulting to SYSTEM.")
                 ThemeSetting.SYSTEM
             }
         }
@@ -84,72 +74,57 @@ class UserPreferencesManager @Inject constructor(@ApplicationContext private val
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 preferences[UserPreferenceKeys.SELECTED_THEME] = theme.name
-                Log.d("UserPrefsManager", "Saved theme: '${theme.name}'")
             }
-        } catch (e: IOException) {
-            Log.e("UserPrefsManager", "IOException while saving theme.", e)
         } catch (e: Exception) {
-            Log.e("UserPrefsManager", "Unexpected error saving theme.", e)
+            Log.e("UserPrefsManager", "Error saving theme: ${theme.name}", e)
         }
     }
 
-
     // --- Настройки последнего выбранного города ---
-    val lastSelectedCityFlow: Flow<City?> = context.appPreferencesDataStore.data
+    val lastSelectedCityFlow: Flow<CityDomain?> = context.appPreferencesDataStore.data // Явно Flow<CityDomain?>
         .catch { exception ->
-            handlePreferenceReadError("last selected city", exception)
+            handlePreferenceReadError("last selected city JSON", exception)
             emit(emptyPreferences())
         }
         .map { preferences ->
-            val name = preferences[UserPreferenceKeys.LAST_CITY_NAME]
-            val lat = preferences[UserPreferenceKeys.LAST_CITY_LAT]
-            val lon = preferences[UserPreferenceKeys.LAST_CITY_LON]
-            val country = preferences[UserPreferenceKeys.LAST_CITY_COUNTRY]
-
-            if (name != null && lat != null && lon != null && country != null) {
-                val state = preferences[UserPreferenceKeys.LAST_CITY_STATE]
-                Log.d("UserPrefsManager", "Read last city: $name, $lat, $lon, $country, State: $state")
-                City(name = name, lat = lat, lon = lon, country = country, state = state, localNames = null)
+            val cityJson = preferences[UserPreferenceKeys.LAST_SELECTED_CITY_JSON]
+            if (cityJson != null && cityJson.isNotBlank()) {
+                try {
+                    json.decodeFromString<CityDomain>(cityJson) // Декодируем в CityDomain
+                } catch (e: Exception) {
+                    Log.e("UserPrefsManager", "Error decoding last city from JSON: $cityJson", e)
+                    null // Возвращаем null в случае ошибки декодирования
+                }
             } else {
-                Log.d("UserPrefsManager", "No valid last city data found in preferences.")
-                null
+                null // Возвращаем null, если JSON нет или он пуст
             }
         }
 
-    suspend fun saveLastSelectedCity(city: City?) {
+    suspend fun saveLastSelectedCity(city: CityDomain?) { // Явно принимает CityDomain?
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 if (city != null) {
-                    preferences[UserPreferenceKeys.LAST_CITY_NAME] = city.name
-                    preferences[UserPreferenceKeys.LAST_CITY_LAT] = city.lat
-                    preferences[UserPreferenceKeys.LAST_CITY_LON] = city.lon
-                    preferences[UserPreferenceKeys.LAST_CITY_COUNTRY] = city.country
-                    if (city.state != null) {
-                        preferences[UserPreferenceKeys.LAST_CITY_STATE] = city.state
-                    } else {
-                        preferences.remove(UserPreferenceKeys.LAST_CITY_STATE)
+                    try {
+                        val cityJson = json.encodeToString(city) // Кодируем CityDomain в JSON
+                        preferences[UserPreferenceKeys.LAST_SELECTED_CITY_JSON] = cityJson
+                        Log.d("UserPrefsManager", "Saved last city as JSON: ${city.name}")
+                    } catch (e: Exception) {
+                        Log.e("UserPrefsManager", "Error encoding city '$${city.name}' to JSON", e)
+                        preferences.remove(UserPreferenceKeys.LAST_SELECTED_CITY_JSON) // Очищаем в случае ошибки
                     }
-                    Log.d("UserPrefsManager", "Saved last city: ${city.name}")
                 } else {
-                    preferences.remove(UserPreferenceKeys.LAST_CITY_NAME)
-                    preferences.remove(UserPreferenceKeys.LAST_CITY_LAT)
-                    preferences.remove(UserPreferenceKeys.LAST_CITY_LON)
-                    preferences.remove(UserPreferenceKeys.LAST_CITY_COUNTRY)
-                    preferences.remove(UserPreferenceKeys.LAST_CITY_STATE)
+                    preferences.remove(UserPreferenceKeys.LAST_SELECTED_CITY_JSON)
                     Log.d("UserPrefsManager", "Cleared last selected city from preferences.")
                 }
             }
-        } catch (e: IOException) {
-            Log.e("UserPrefsManager", "IOException while saving last city.", e)
         } catch (e: Exception) {
-            Log.e("UserPrefsManager", "Unexpected error saving last city.", e)
+            Log.e("UserPrefsManager", "Exception while saving last city: ", e)
         }
     }
 
-    // Вспомогательная функция для обработки ошибок чтения
     private fun handlePreferenceReadError(preferenceName: String, exception: Throwable) {
         if (exception is IOException) {
-            Log.e("UserPrefsManager", "IOException while reading $preferenceName preferences.", exception)
+            Log.e("UserPrefsManager", "IOException reading $preferenceName preferences.", exception)
         } else {
             Log.e("UserPrefsManager", "Unexpected error reading $preferenceName preferences.", exception)
         }

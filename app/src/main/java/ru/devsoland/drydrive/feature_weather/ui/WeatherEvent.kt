@@ -2,11 +2,10 @@ package ru.devsoland.drydrive.feature_weather.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import ru.devsoland.drydrive.common.model.AppLanguage // Импорт для AppLanguage
-import ru.devsoland.drydrive.data.api.model.City
+import ru.devsoland.drydrive.common.model.AppLanguage
+import ru.devsoland.drydrive.feature_weather.ui.model.CityDomainUiModel // <--- ИЗМЕНЕНО: Импорт новой UI модели
 
 sealed class WeatherEvent {
-    // Определение Recommendation ПЕРЕМЕЩЕНО ВНУТРЬ WeatherEvent
     data class Recommendation(
         val id: String,
         val textResId: Int,
@@ -14,13 +13,14 @@ sealed class WeatherEvent {
         val icon: ImageVector,
         val isActive: Boolean,
         val activeColor: Color,
-        val activeAlpha: Float = 1.0f, // ДОБАВЛЕНО
-        val inactiveAlpha: Float = 0.6f // ДОБАВЛЕНО
-    ) // Recommendation НЕ ДОЛЖЕН наследовать WeatherEvent
+        val activeAlpha: Float = 1.0f,
+        val inactiveAlpha: Float = 0.6f
+    )
 
     // События поиска городов
     data class SearchQueryChanged(val query: String) : WeatherEvent()
-    data class CitySelectedFromSearch(val city: City, val formattedName: String) : WeatherEvent()
+    // ИЗМЕНЕНО: CitySelectedFromSearch теперь принимает CityDomainUiModel
+    data class CitySelectedFromSearch(val city: CityDomainUiModel) : WeatherEvent()
     object DismissCitySearchDropDown : WeatherEvent()
 
     // События погоды
@@ -28,7 +28,6 @@ sealed class WeatherEvent {
     object ClearWeatherErrorMessage : WeatherEvent()
 
     // События для диалога рекомендаций
-    // Теперь Recommendation - это WeatherEvent.Recommendation, что будет правильно разрешаться
     data class RecommendationClicked(val recommendation: Recommendation) : WeatherEvent()
     object DismissRecommendationDialog : WeatherEvent()
 
@@ -37,6 +36,5 @@ sealed class WeatherEvent {
 
     data class BottomNavItemSelected(val index: Int) : WeatherEvent()
 
-    // Новое событие для смены языка
     data class ChangeLanguage(val language: AppLanguage) : WeatherEvent()
 }

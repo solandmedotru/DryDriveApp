@@ -22,6 +22,12 @@
     <string name="error_network_unavailable">Сеть недоступна. Проверьте интернет-соединение.</string>
     <string name="status_getting_location_weather">Получение погоды для вашего местоположения…</string>
     <string name="label_current_location">Текущее местоположение</string>
+    <string name="city_search_too_short">Введите минимум 2 символа</string>
+    <string name="city_search_no_results">Город не найден</string>
+    <string name="city_search_error">Ошибка поиска города</string>
+    <string name="hide_search_description">Скрыть поиск</string>
+    <string name="city_search_no_results_in_dropdown">Нет результатов</string>
+    <string name="error_api_key_invalid">API key is invalid or unauthorized. Please check your key.</string>
 
     <!-- Car Wash Recommendations -->
     <string name="wash_not_recommended">Мойка не рекомендуется.</string>
@@ -34,11 +40,52 @@
 
     <!-- Weather Details -->
     <string name="weather_data_unavailable">Нет данных</string>
+    <string name="details_weather_description">Подробная погода</string>
+    <string name="details_feels_like">Ощущается как:</string>
+    <string name="details_temp_min_max_format">Мин: %1$d° Макс: %2$d°</string>
+    <string name="details_wind_label">Ветер</string>
+    <string name="details_humidity_label">Влажность</string>
+    <string name="details_pressure_label">Давление</string>
+    <string name="details_visibility_label">Видимость</string>
+    <string name="details_clouds_label">Облачность</string>
+    <string name="details_sunrise_label">Восход</string>
+    <string name="details_sunset_label">Закат</string>
+    <string name="details_precipitation">Осадки</string> <!-- Добавлено для консистентности, если понадобится -->
+
+    <!-- Units & Formatting (включая для ForecastItemMapper) -->
+    <string name="unit_temperature_celsius">°</string>
+    <string name="unit_mps">м/с</string>
+    <string name="unit_hpa">гПа</string>
+    <string name="unit_km">км</string>
+    <string name="format_pressure_hpa">%1$s гПа</string> <!-- Для ForecastItemMapper -->
+    <string name="format_wind_speed_mps">%1$d м/с</string> <!-- Для ForecastItemMapper -->
+    <string name="format_visibility_km">%1$s км</string> <!-- Для ForecastItemMapper -->
+
+    <!-- Wind Directions -->
+    <string name="wind_dir_n">С</string>
+    <string name="wind_dir_ne">СВ</string>
+    <string name="wind_dir_e">В</string>
+    <string name="wind_dir_se">ЮВ</string>
+    <string name="wind_dir_s">Ю</string>
+    <string name="wind_dir_sw">ЮЗ</string>
+    <string name="wind_dir_w">З</string>
+    <string name="wind_dir_nw">СЗ</string>
+
+    <!-- Weather Condition Keywords (for logic in WeatherScreenContent) -->
+    <string name="condition_rain">дождь</string>
+    <string name="condition_snow">снег</string>
+    <string name="condition_thunderstorm">гроза</string>
+    <string name="condition_drizzle">морось</string>
+    <string name="condition_mist">дымка</string>
+    <string name="condition_fog">туман</string>
 
     <!-- Forecast -->
     <string name="forecast_now">Сейчас</string>
     <string name="forecast_icon_description_template">Погода: %s</string>
     <string name="forecast_unavailable">Прогноз недоступен</string>
+    <string name="action_collapse">Свернуть</string>
+    <string name="action_expand">Развернуть</string>
+    <string name="details_precipitation_probability">Вероятность осадков:</string>
 
     <!-- Recommendations -->
     <string name="rec_drink_water_default">Пейте воду!</string>
@@ -61,7 +108,6 @@
     <string name="rec_umbrella_desc_default">Рекомендация: возьмите зонт</string>
     <string name="rec_umbrella_desc_active">Активная рекомендация: возьмите зонт</string>
 
-    <!-- НОВЫЕ КОРОТКИЕ Рекомендации -->
     <string name="rec_dress_warmly_default">Теплее</string>
     <string name="rec_dress_warmly_active">Теплее!</string>
     <string name="rec_dress_warmly_desc_default">Рекомендация: Одевайтесь теплее.</string>
@@ -102,58 +148,17 @@
     <string name="nav_map">Карта</string>
     <string name="nav_settings">Настройки</string>
     <string name="open_navigation_drawer">Открыть меню навигации</string>
+    <string name="bottom_nav_weather">Погода</string>
 
     <!-- Settings -->
     <string name="language_russian">Русский</string>
     <string name="language_english">Английский</string>
-    <string name="settings_language_title">Язык приложения</string>
-    <string name="map_screen_placeholder">Карта (в разработке)</string>
     <string name="language_system">Системный</string>
-
-
+    <string name="settings_language_title">Язык приложения</string>
     <string name="settings_theme_title">Тема оформления</string>
     <string name="settings_theme_dark_mode_toggle">Темная тема</string>
-    <string name="unit_temperature_celsius">°</string> <!-- Или °C, как вам больше нравится -->
-    <string name="format_pressure_hpa">%1$s гПа</string> <!-- %1$s будет заменено на значение давления -->
-    <string name="format_wind_speed_mps">%1$d м/с</string> <!-- %1$d для целого числа скорости ветра -->
-    <string name="format_visibility_km">%1$s км</string>
-    <string name="wind_dir_n">С</string>
-    <string name="wind_dir_ne">СВ</string>
-    <string name="wind_dir_e">В</string>
-    <string name="wind_dir_se">ЮВ</string>
-    <string name="wind_dir_s">Ю</string>
-    <string name="wind_dir_sw">ЮЗ</string>
-    <string name="wind_dir_w">З</string>
-    <string name="wind_dir_nw">СЗ</string>
 
-    <!-- Для раскрывающихся карточек прогноза -->
-    <string name="action_collapse">Свернуть</string>
-    <string name="action_expand">Развернуть</string>
-    <string name="details_feels_like">Ощущается как:</string>
-    <string name="details_humidity">Влажность:</string>
-    <string name="details_pressure_hpa_label">Давление:</string> <!-- Метка для давления -->
-    <string name="pressure_units_hpa">гПа</string> <!-- Единица для отображения отдельно, если нужно -->
-    <string name="details_wind_speed_mps_label">Ветер:</string> <!-- Метка для ветра -->
-    <string name="wind_speed_units_mps">м/с</string> <!-- Единица для отображения отдельно, если нужно -->
-    <string name="details_visibility_km_label">Видимость:</string> <!-- Метка для видимости -->
-    <string name="visibility_units_km">км</string> <!-- Единица для отображения отдельно, если нужно -->
-    <string name="details_clouds">Облачность:</string>
-    <string name="details_precipitation_probability">Вероятность осадков:</string>
-
-    <string name="city_search_too_short">Введите минимум 2 символа</string>
-    <string name="city_search_no_results">Город не найден</string>
-    <string name="city_search_error">Ошибка поиска города</string>
-    <string name="hide_search_description">Скрыть поиск</string>
-    <string name="city_search_no_results_in_dropdown">Нет результатов</string>
-    <string name="bottom_nav_weather">Погода</string>
-    <string name="details_weather_description">Подробная погода</string>
-    <string name="error_api_key_invalid">API key is invalid or unauthorized. Please check your key.</string>
-    <string name="details_feels_like_short">Ощущается</string>
-    <string name="details_humidity_short">Влажность</string>
-    <string name="details_wind_label_short">Ветер</string>
-    <string name="details_pressure_label_short">Давление</string>
-    <string name="details_visibility_label_short">Видимость</string>
-    <string name="details_clouds_short">Облачность</string>
-    <string name="details_precipitation_short">Осадки</string>
+    <!-- Placeholder for map screen -->
+    <string name="map_screen_placeholder">Карта (в разработке)</string>
 
 </resources>

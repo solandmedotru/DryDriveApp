@@ -1,31 +1,22 @@
 package ru.devsoland.drydrive.di
 
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+// import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory // Не нужен здесь больше
 import dagger.Module
-import dagger.Provides
+// import dagger.Provides // Не нужен здесь больше
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import retrofit2.Retrofit
-import ru.devsoland.drydrive.data.WeatherApi
+// import kotlinx.serialization.json.Json // Не нужен здесь больше
+// import okhttp3.MediaType.Companion.toMediaType // Не нужен здесь больше
+// import retrofit2.Retrofit // Не нужен здесь больше
+// import ru.devsoland.drydrive.data.WeatherApi // Не нужен здесь больше
 
-import javax.inject.Singleton
+// import javax.inject.Singleton // Не нужен здесь больше
 
 @Module
-@InstallIn(SingletonComponent::class) // Предоставляем зависимость на уровне всего приложения
+@InstallIn(SingletonComponent::class)
 object AppModule {
-    private const val BASE_URL = "https://api.openweathermap.org/"
-    @Provides
-    @Singleton // WeatherApi будет создан один раз и переиспользован
-    fun provideWeatherApi(): WeatherApi {
-        // Здесь используется ваш существующий способ создания WeatherApi
+    // private const val BASE_URL = "https://api.openweathermap.org/" // Удалено, есть в NetworkModule
 
-        val json = Json { ignoreUnknownKeys = true }
-        return Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
-            .create(WeatherApi::class.java)
-    }
+    // Метод provideWeatherApi() удален, так как он дублировался в NetworkModule
+    // и NetworkModule предоставляет его более корректно, используя предоставленный Retrofit.
 }
