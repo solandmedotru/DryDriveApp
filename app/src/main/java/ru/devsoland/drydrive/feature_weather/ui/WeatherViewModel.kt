@@ -15,15 +15,17 @@ import kotlinx.coroutines.launch
 import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.common.model.ThemeSetting
-import ru.devsoland.drydrive.data.api.model.ForecastListItem
-import ru.devsoland.drydrive.data.api.model.ForecastResponse
-import ru.devsoland.drydrive.data.WeatherApi // ВРЕМЕННО для getFiveDayForecast
+// import ru.devsoland.drydrive.data.api.model.ForecastListItem // Удалено
+// import ru.devsoland.drydrive.data.api.model.ForecastResponse // Удалено
+// import ru.devsoland.drydrive.data.WeatherApi // Удалено
 import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
 import ru.devsoland.drydrive.domain.model.CityDomain
 import ru.devsoland.drydrive.domain.model.Result
+import ru.devsoland.drydrive.domain.model.SingleForecastDomain // Добавлено
 import ru.devsoland.drydrive.domain.usecase.GetCurrentWeatherUseCase
+import ru.devsoland.drydrive.domain.usecase.GetForecastUseCase // Добавлено
 import ru.devsoland.drydrive.domain.usecase.SearchCitiesUseCase
-import ru.devsoland.drydrive.feature_weather.mapper.toForecastCardUiModel
+import ru.devsoland.drydrive.feature_weather.mapper.toForecastCardUiModel // Теперь содержит и маппер для SingleForecastDomain
 import ru.devsoland.drydrive.feature_weather.ui.mapper.toUiModel // Наши UI мапперы (Domain -> UI)
 import ru.devsoland.drydrive.feature_weather.ui.model.CityDomainUiModel
 import ru.devsoland.drydrive.feature_weather.ui.model.ForecastCardUiModel
@@ -32,8 +34,9 @@ import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent.Recommendation
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone // Добавлено для UTC в processDomainForecastToUiModel
 import javax.inject.Inject
-import ru.devsoland.drydrive.BuildConfig
+// import ru.devsoland.drydrive.BuildConfig // Удалено, если apiKey больше не нужен
 
 data class WeatherUiState(
     val isLoadingCities: Boolean = false,
@@ -60,13 +63,14 @@ data class WeatherUiState(
 class WeatherViewModel @Inject constructor(
     private val getCurrentWeatherUseCase: GetCurrentWeatherUseCase,
     private val searchCitiesUseCase: SearchCitiesUseCase,
+    private val getForecastUseCase: GetForecastUseCase, // Добавлено
     private val userPreferencesManager: UserPreferencesManager,
-    private val application: Application,
-    private val weatherApi: WeatherApi // ВРЕМЕННО, пока не рефакторен UseCase для прогноза
+    private val application: Application
+    // private val weatherApi: WeatherApi // Удалено
 ) : AndroidViewModel(application) {
 
     private val tag = "WeatherViewModel"
-    private val apiKey: String = BuildConfig.WEATHER_API_KEY
+    // private val apiKey: String = BuildConfig.WEATHER_API_KEY // Удалено
 
     private val _uiState = MutableStateFlow(WeatherUiState())
     val uiState: StateFlow<WeatherUiState> = _uiState.asStateFlow()
@@ -170,12 +174,9 @@ class WeatherViewModel @Inject constructor(
 
                 if (currentState.currentLanguageCode != newLangCode) {
                     Log.d(tag, "Language changed to: $newLangCode.")
-                    // Обновляем UiState с новым кодом языка
                     _uiState.update { it.copy(currentLanguageCode = newLangCode) }
 
-                    // Если есть выбранный город, обновляем его displayName и перезапрашиваем погоду
                     currentState.selectedCity?.let { currentSelectedCityUiModel ->
-                        // Воссоздаем CityDomain из текущей CityDomainUiModel
                         val cityDomain = CityDomain(
                             name = currentSelectedCityUiModel.originalNameFromApi ?: currentSelectedCityUiModel.displayName,
                             lat = currentSelectedCityUiModel.lat,
@@ -184,15 +185,11 @@ class WeatherViewModel @Inject constructor(
                             state = currentSelectedCityUiModel.state,
                             localNames = currentSelectedCityUiModel.allLocalNames
                         )
-                        // Маппим CityDomain в CityDomainUiModel с новым языком
                         val updatedSelectedCityUiModel = cityDomain.toUiModel(newLangCode)
-
-                        // Обновляем selectedCity в UiState и запрашиваем погоду
                         _uiState.update { it.copy(selectedCity = updatedSelectedCityUiModel) }
                         fetchCurrentWeatherAndForecast(updatedSelectedCityUiModel, newLangCode)
                     }
 
-                    // Очищаем список результатов поиска, так как язык изменился
                     if (currentState.cities.isNotEmpty()) {
                         _uiState.update { it.copy(cities = emptyList()) }
                     }
@@ -294,7 +291,14 @@ class WeatherViewModel @Inject constructor(
         viewModelScope.launch {
             val apiLang = explicitApiLang ?: getApiLangCode()
             _uiState.update {
-                it.copy(isLoadingWeather = true, weather = null, weatherErrorMessage = null, isLoadingForecast = true, dailyForecasts = emptyList(), forecastErrorMessage = null)
+                it.copy(
+                    isLoadingWeather = true, 
+                    weather = null, 
+                    weatherErrorMessage = null, 
+                    isLoadingForecast = true, // Показываем загрузку прогноза
+                    dailyForecasts = emptyList(), 
+                    forecastErrorMessage = null
+                )
             }
 
             var weatherFetchError: String? = null
@@ -307,10 +311,10 @@ class WeatherViewModel @Inject constructor(
                 is Result.Error -> {
                     Log.e(tag, "Failed to fetch current weather for ${city.displayName}. Error: ${weatherResult.message}", weatherResult.exception)
                     weatherFetchError = weatherResult.message ?: application.getString(R.string.error_loading_weather)
-                    if (weatherResult.message?.contains("401", ignoreCase = true) ?: false) {
+                    if (weatherResult.message?.contains("401", ignoreCase = true) == true) {
                         weatherFetchError = application.getString(R.string.error_api_key_invalid)
-                    } else if ((weatherResult.message?.contains("404", ignoreCase = true) ?: false) ||
-                               (weatherResult.message?.contains("city not found", ignoreCase = true) ?: false)) {
+                    } else if ((weatherResult.message?.contains("404", ignoreCase = true) == true) ||
+                               (weatherResult.message?.contains("city not found", ignoreCase = true) == true)) {
                         weatherFetchError = application.getString(R.string.city_not_found)
                     }
                 }
@@ -318,59 +322,63 @@ class WeatherViewModel @Inject constructor(
 
             var forecastFetchError: String? = null
             var processedForecasts: List<ForecastCardUiModel> = emptyList()
+
             if (city.lat != 0.0 && city.lon != 0.0) {
-                try {
-                    val forecastResponse = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                         weatherApi.getFiveDayForecast(lat = city.lat, lon = city.lon, apiKey = apiKey, lang = apiLang)
+                when (val forecastResult = getForecastUseCase(lat = city.lat, lon = city.lon, lang = apiLang)) {
+                    is Result.Success -> {
+                        val forecastDomainData = forecastResult.data
+                        // dt текущей погоды нужен для подсветки "сегодня" в списке прогнозов
+                        val currentDtForForecastHighlight = fetchedWeatherUiModel?.dt ?: (System.currentTimeMillis() / 1000L)
+                        processedForecasts = processDomainForecastToUiModel(forecastDomainData.forecasts, currentDtForForecastHighlight)
                     }
-                    val currentDtForForecast = fetchedWeatherUiModel?.dt ?: (System.currentTimeMillis() / 1000L)
-                    processedForecasts = processForecastResponse(forecastResponse, currentDtForForecast)
-                } catch (e: Exception) {
-                    Log.e(tag, "Failed to fetch/process forecast for ${city.displayName}. Error: ${e.message}", e)
-                    forecastFetchError = application.applicationContext.getString(R.string.error_loading_weather)
+                    is Result.Error -> {
+                        Log.e(tag, "Failed to fetch forecast for ${city.displayName}. Error: ${forecastResult.message}", forecastResult.exception)
+                        // Используйте разные строки ошибок для погоды и прогноза, если это необходимо
+                        forecastFetchError = forecastResult.message ?: application.getString(R.string.error_loading_forecast) 
+                        if (forecastResult.message?.contains("401", ignoreCase = true) == true) {
+                            forecastFetchError = application.getString(R.string.error_api_key_invalid) // Та же ошибка API ключа
+                        } 
+                    }
                 }
             } else {
                 Log.w(tag, "Skipping forecast: Invalid Lat/Lon for ${city.displayName}.")
+                forecastFetchError = application.getString(R.string.error_invalid_lat_lon_for_forecast) // Новая строка для этой ошибки
             }
 
             val currentRecommendations = generateRecommendations(fetchedWeatherUiModel, processedForecasts)
 
             _uiState.update {
                 it.copy(
-                    weather = fetchedWeatherUiModel ?: it.weather,
+                    weather = fetchedWeatherUiModel ?: it.weather, // Оставляем старую погоду, если новая не загрузилась
                     dailyForecasts = processedForecasts,
                     isLoadingWeather = false,
-                    isLoadingForecast = false,
+                    isLoadingForecast = false, // Загрузка прогноза завершена
                     weatherErrorMessage = weatherFetchError,
                     forecastErrorMessage = forecastFetchError,
-                    isInitialLoading = false,
+                    isInitialLoading = false, 
                     recommendations = currentRecommendations
                 )
             }
         }
     }
 
-    private fun processForecastResponse(
-        response: ForecastResponse,
-        currentWeatherDt: Long
+    // Новая функция для обработки доменных моделей прогноза
+    private fun processDomainForecastToUiModel(
+        forecastItems: List<SingleForecastDomain>,
+        currentWeatherDt: Long 
     ): List<ForecastCardUiModel> {
-        val dailyData = mutableMapOf<String, MutableList<ForecastListItem>>()
-        val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH).apply {
-            timeZone = java.util.TimeZone.getTimeZone("UTC")
-        }
-        val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).apply {
-            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        if (forecastItems.isEmpty()) {
+            return emptyList()
         }
 
-        response.list.forEach { item ->
-            try {
-                inputFormat.parse(item.dtTxt)?.let { utcDate ->
-                    val dayKey = dayKeyFormat.format(utcDate)
-                    dailyData.getOrPut(dayKey) { mutableListOf() }.add(item)
-                }
-            } catch (e: Exception) {
-                Log.e(tag, "Error parsing API date: ${item.dtTxt}", e)
-            }
+        val dailyData = mutableMapOf<String, MutableList<SingleForecastDomain>>()
+        val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+
+        forecastItems.forEach { item ->
+            val dayKey = dayKeyFormat.format(Date(item.dateTimeMillis))
+            dailyData.getOrPut(dayKey) { mutableListOf() }.add(item)
         }
 
         val forecastCardUiModels = mutableListOf<ForecastCardUiModel>()
@@ -382,19 +390,28 @@ class WeatherViewModel @Inject constructor(
             .sortedBy { it.key }
             .take(5)
             .forEach { entry ->
-                val targetItem = entry.value.find { it.dtTxt.substring(11, 13) == "12" } ?: entry.value.firstOrNull()
-                targetItem?.let {
-                    val itemDateForHighlight = todaySdf.format(Date(it.dt * 1000L))
-                    val isHighlighted = itemDateForHighlight == todayKeyForHighlight
+                val representativeItem = entry.value.find { item ->
+                    val hourOfDay = SimpleDateFormat("HH", Locale.ENGLISH).apply {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }.format(Date(item.dateTimeMillis)).toIntOrNull()
+                    hourOfDay in 11..13
+                } ?: entry.value.firstOrNull()
 
+                representativeItem?.let { item ->
+                    val itemDateForHighlight = todaySdf.format(Date(item.dateTimeMillis))
+                    val isHighlighted = itemDateForHighlight == todayKeyForHighlight
                     forecastCardUiModels.add(
-                        it.toForecastCardUiModel(context = application.applicationContext, isHighlighted = isHighlighted)
+                        item.toForecastCardUiModel(
+                            context = application.applicationContext,
+                            isHighlighted = isHighlighted
+                        )
                     )
                 }
             }
         return forecastCardUiModels
     }
 
+    // generateRecommendations остается без изменений
     private fun generateRecommendations(weatherData: WeatherDetailsUiModel?, forecastData: List<ForecastCardUiModel>?): List<Recommendation> {
         val recommendations = mutableListOf<Recommendation>()
         if (weatherData == null) return emptyList()
@@ -413,7 +430,6 @@ class WeatherViewModel @Inject constructor(
         val isColdForTires = currentTemp < 3.0
         recommendations.add(Recommendation(id = "check_tires", textResId = if (isColdForTires) R.string.rec_tire_change_active else R.string.rec_tire_change_default, descriptionResId = if (isColdForTires) R.string.rec_tire_change_desc_active else R.string.rec_tire_change_desc_default, icon = Icons.Filled.DirectionsCar, isActive = isColdForTires, activeColor = Color(0xFF81D4FA), activeAlpha = 1.0f, inactiveAlpha = 0.6f))
 
-        // Используем application.getString для доступа к ресурсам строк
         val rainCondition = application.getString(R.string.condition_rain).lowercase(Locale.getDefault())
         val snowCondition = application.getString(R.string.condition_snow).lowercase(Locale.getDefault())
 

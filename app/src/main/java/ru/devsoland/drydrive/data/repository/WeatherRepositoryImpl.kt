@@ -2,8 +2,9 @@ package ru.devsoland.drydrive.data.repository
 
 import ru.devsoland.drydrive.BuildConfig
 import ru.devsoland.drydrive.data.WeatherApi
-import ru.devsoland.drydrive.data.mapper.toDomain // Импорт наших мапперов
+import ru.devsoland.drydrive.data.mapper.* // Импортируем все мапперы
 import ru.devsoland.drydrive.domain.model.CityDomain
+import ru.devsoland.drydrive.domain.model.FullForecastDomain // Импорт для новой модели прогноза
 import ru.devsoland.drydrive.domain.model.WeatherDomain
 import ru.devsoland.drydrive.domain.repository.WeatherRepository
 import ru.devsoland.drydrive.domain.model.Result
@@ -35,6 +36,20 @@ class WeatherRepositoryImpl @Inject constructor(
         return try {
             val response = weatherApi.searchCities(query = query, limit = limit, apiKey = apiKey)
             Result.Success(response.toDomain()) // Используем маппер List<ApiCity>.toDomain()
+        } catch (e: Exception) {
+            Result.Error(e, e.localizedMessage)
+        }
+    }
+
+    override suspend fun getForecast(lat: Double, lon: Double, lang: String): Result<FullForecastDomain> {
+        return try {
+            val responseDto = weatherApi.getFiveDayForecast(
+                lat = lat,
+                lon = lon,
+                apiKey = apiKey,
+                lang = lang
+            )
+            Result.Success(responseDto.toDomain()) // Использует toDomain из ForecastMappers.kt
         } catch (e: Exception) {
             Result.Error(e, e.localizedMessage)
         }

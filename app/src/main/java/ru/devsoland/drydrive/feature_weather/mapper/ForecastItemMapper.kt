@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.annotation.DrawableRes
 import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.data.api.model.ForecastListItem
+import ru.devsoland.drydrive.domain.model.SingleForecastDomain // Новый импорт
 import ru.devsoland.drydrive.feature_weather.ui.model.ForecastCardUiModel
 // Импорт для функции getWeatherIconResource - убедитесь, что она существует или будет создана
 import ru.devsoland.drydrive.feature_weather.ui.util.getWeatherIconResource 
@@ -88,4 +89,70 @@ private fun getWindDirectionString(degrees: Int, context: Context): String {
     )
     val index = ((degrees.toDouble() % 360) / 45.0).roundToInt() % 8
     return directions[index]
+}
+
+/**
+ * Преобразует доменную модель SingleForecastDomain в UI модель ForecastCardUiModel.
+ *
+ * @param context Контекст для доступа к строковым ресурсам.
+ * @param isHighlighted Флаг, указывающий, является ли этот день "сегодняшним" для выделения.
+ */
+fun SingleForecastDomain.toForecastCardUiModel(
+    context: Context,
+    isHighlighted: Boolean
+): ForecastCardUiModel {
+    val sdfDayShort = SimpleDateFormat("E", Locale.getDefault())
+    // Используем dateTimeMillis из SingleForecastDomain
+    val dayShort = sdfDayShort.format(Date(this.dateTimeMillis)).replaceFirstChar { it.titlecase(Locale.getDefault()) }
+
+    // Используем поля из SingleForecastDomain
+    val iconCodeApi = this.weatherIconId 
+
+    @DrawableRes val iconRes = getWeatherIconResource(
+        iconCode = iconCodeApi,
+        weatherId = this.weatherConditionId
+    )
+
+    val temperature = "${this.tempCelsius.roundToInt()}${context.getString(R.string.unit_temperature_celsius)}"
+    val feelsLike = "${this.feelsLikeCelsius.roundToInt()}${context.getString(R.string.unit_temperature_celsius)}"
+    val humidity = "${this.humidityPercent}%"
+    val pressure = context.getString(R.string.format_pressure_hpa, this.pressureHpa.toString())
+
+    val windSpeed = this.windSpeedMps.roundToInt()
+    val windSpeedString = context.getString(R.string.format_wind_speed_mps, windSpeed)
+    val windDirection = getWindDirectionString(this.windDirectionDegrees, context) // getWindDirectionString уже есть в файле
+    val windInfo = "$windSpeedString, $windDirection"
+    
+    val visibilityValue = this.visibilityMeters / 1000.0
+    val visibilityFormatted = if (visibilityValue == visibilityValue.toInt().toDouble()) {
+        visibilityValue.toInt().toString()
+    } else {
+        String.format(Locale.US, "%.1f", visibilityValue)
+    }
+    val visibility = context.getString(R.string.format_visibility_km, visibilityFormatted)
+
+    val clouds = "${this.cloudinessPercent}%"
+    // precipitationProbability в SingleForecastDomain уже от 0.0 до 1.0
+    val precipitationProbability = "${(this.precipitationProbability * 100).roundToInt()}%" 
+
+    val weatherDescriptionText = this.weatherDescription.replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+    }
+
+    return ForecastCardUiModel(
+        id = this.dateTimeMillis / 1000L, // id в ForecastCardUiModel ожидает Long, похожий на dt (timestamp в секундах)
+        dayShort = dayShort,
+        iconRes = iconRes,
+        iconCodeApi = iconCodeApi,
+        temperature = temperature,
+        isHighlighted = isHighlighted,
+        feelsLike = feelsLike,
+        humidity = humidity,
+        pressure = pressure,
+        windInfo = windInfo,
+        visibility = visibility,
+        clouds = clouds,
+        precipitationProbability = precipitationProbability,
+        weatherDescription = weatherDescriptionText
+    )
 }

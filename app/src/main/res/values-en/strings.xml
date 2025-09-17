@@ -17,8 +17,10 @@
     <!-- Error messages and states from ViewModel -->
     <string name="error_loading_cities">Failed to load city list.</string>
     <string name="error_loading_weather">Failed to load weather data.</string>
+    <string name="error_loading_forecast">Failed to load weather data.</string>
     <string name="error_unknown">An unknown error occurred.</string>
     <string name="error_location_unavailable">Location unavailable. Check permissions or enable location services.</string>
+    <string name="error_invalid_lat_lon_for_forecast">Location unavailable. Check permissions or enable location services.</string>
     <string name="error_network_unavailable">Network unavailable. Check your internet connection.</string>
     <string name="status_getting_location_weather">Getting weather for your location…</string>
     <string name="label_current_location">Current location</string>

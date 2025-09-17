@@ -17,8 +17,10 @@
     <!-- Сообщения об ошибках и состояниях из ViewModel -->
     <string name="error_loading_cities">Не удалось загрузить список городов.</string>
     <string name="error_loading_weather">Не удалось загрузить данные о погоде.</string>
+    <string name="error_loading_forecast">Не удалось загрузить данные о погоде.</string>
     <string name="error_unknown">Произошла неизвестная ошибка.</string>
     <string name="error_location_unavailable">Местоположение недоступно. Проверьте разрешения или включите службы геолокации.</string>
+    <string name="error_invalid_lat_lon_for_forecast">Местоположение недоступно. Проверьте разрешения или включите службы геолокации.</string>
     <string name="error_network_unavailable">Сеть недоступна. Проверьте интернет-соединение.</string>
     <string name="status_getting_location_weather">Получение погоды для вашего местоположения…</string>
     <string name="label_current_location">Текущее местоположение</string>
