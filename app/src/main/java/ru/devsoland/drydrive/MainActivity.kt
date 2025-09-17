@@ -35,7 +35,9 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var userPreferencesManager: UserPreferencesManager
+    lateinit var userPreferencesManager: UserPreferencesManager // Эта зависимость может остаться, так как UserPreferencesManager реализует репозиторий
+                                                                // и Hilt знает, как его предоставить. Либо можно будет поменять на UserPreferencesRepository.
+                                                                // Для EntryPoint это тоже должно работать.
 
     private val weatherViewModel: WeatherViewModel by viewModels()
     private val tag = "MainActivityLifecycle"
@@ -57,7 +59,7 @@ class MainActivity : ComponentActivity() {
 
         val currentLanguageCode = try {
             runBlocking {
-                tempUserPrefsManager.selectedLanguageFlow.first().code
+                tempUserPrefsManager.selectedLanguage.first().code // ИСПРАВЛЕНО
             }
         } catch (e: Exception) {
             Log.e(tag, "Error getting language code for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.", e)
@@ -92,7 +94,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val currentThemeSetting by userPreferencesManager.selectedThemeFlow.collectAsState(
+            val currentThemeSetting by userPreferencesManager.selectedTheme.collectAsState( // ИСПРАВЛЕНО
                 initial = ThemeSetting.SYSTEM
             )
 

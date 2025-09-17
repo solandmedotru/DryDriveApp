@@ -14,7 +14,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.common.model.ThemeSetting
-import ru.devsoland.drydrive.domain.model.CityDomain // <--- Убеждаемся, что это CityDomain
+import ru.devsoland.drydrive.domain.model.CityDomain
+import ru.devsoland.drydrive.domain.repository.UserPreferencesRepository // Добавлен импорт
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,17 +25,18 @@ private val Context.appPreferencesDataStore by preferencesDataStore(name = "user
 object UserPreferenceKeys {
     val SELECTED_LANGUAGE_CODE = stringPreferencesKey("selected_language_code")
     val SELECTED_THEME = stringPreferencesKey("selected_theme")
-    val LAST_SELECTED_CITY_JSON = stringPreferencesKey("last_selected_city_json") // Ключ для JSON строки CityDomain
+    val LAST_SELECTED_CITY_JSON = stringPreferencesKey("last_selected_city_json")
 }
 
 @Singleton
 class UserPreferencesManager @Inject constructor(
     @ApplicationContext private val context: Context
-) {
-    private val json: Json = Json { ignoreUnknownKeys = true; prettyPrint = false } // prettyPrint можно убрать для продакшена
+) : UserPreferencesRepository { // Реализуем интерфейс
+
+    private val json: Json = Json { ignoreUnknownKeys = true; prettyPrint = false }
 
     // --- Языковые настройки ---
-    val selectedLanguageFlow: Flow<AppLanguage> = context.appPreferencesDataStore.data
+    override val selectedLanguage: Flow<AppLanguage> = context.appPreferencesDataStore.data // Переименовано и override
         .catch { exception ->
             handlePreferenceReadError("language", exception)
             emit(emptyPreferences())
@@ -44,7 +46,7 @@ class UserPreferencesManager @Inject constructor(
             AppLanguage.fromCode(languageCode)
         }
 
-    suspend fun saveSelectedLanguage(language: AppLanguage) {
+    override suspend fun saveSelectedLanguage(language: AppLanguage) { // override
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 preferences[UserPreferenceKeys.SELECTED_LANGUAGE_CODE] = language.code
@@ -55,7 +57,7 @@ class UserPreferencesManager @Inject constructor(
     }
 
     // --- Настройки темы ---
-    val selectedThemeFlow: Flow<ThemeSetting> = context.appPreferencesDataStore.data
+    override val selectedTheme: Flow<ThemeSetting> = context.appPreferencesDataStore.data // Переименовано и override
         .catch { exception ->
             handlePreferenceReadError("theme", exception)
             emit(emptyPreferences())
@@ -70,7 +72,7 @@ class UserPreferencesManager @Inject constructor(
             }
         }
 
-    suspend fun saveSelectedTheme(theme: ThemeSetting) {
+    override suspend fun saveSelectedTheme(theme: ThemeSetting) { // override
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 preferences[UserPreferenceKeys.SELECTED_THEME] = theme.name
@@ -81,7 +83,7 @@ class UserPreferencesManager @Inject constructor(
     }
 
     // --- Настройки последнего выбранного города ---
-    val lastSelectedCityFlow: Flow<CityDomain?> = context.appPreferencesDataStore.data // Явно Flow<CityDomain?>
+    override val lastSelectedCity: Flow<CityDomain?> = context.appPreferencesDataStore.data // Переименовано и override
         .catch { exception ->
             handlePreferenceReadError("last selected city JSON", exception)
             emit(emptyPreferences())
@@ -90,27 +92,27 @@ class UserPreferencesManager @Inject constructor(
             val cityJson = preferences[UserPreferenceKeys.LAST_SELECTED_CITY_JSON]
             if (cityJson != null && cityJson.isNotBlank()) {
                 try {
-                    json.decodeFromString<CityDomain>(cityJson) // Декодируем в CityDomain
+                    json.decodeFromString<CityDomain>(cityJson)
                 } catch (e: Exception) {
                     Log.e("UserPrefsManager", "Error decoding last city from JSON: $cityJson", e)
-                    null // Возвращаем null в случае ошибки декодирования
+                    null
                 }
             } else {
-                null // Возвращаем null, если JSON нет или он пуст
+                null
             }
         }
 
-    suspend fun saveLastSelectedCity(city: CityDomain?) { // Явно принимает CityDomain?
+    override suspend fun saveLastSelectedCity(city: CityDomain?) { // override
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 if (city != null) {
                     try {
-                        val cityJson = json.encodeToString(city) // Кодируем CityDomain в JSON
+                        val cityJson = json.encodeToString(city)
                         preferences[UserPreferenceKeys.LAST_SELECTED_CITY_JSON] = cityJson
                         Log.d("UserPrefsManager", "Saved last city as JSON: ${city.name}")
                     } catch (e: Exception) {
-                        Log.e("UserPrefsManager", "Error encoding city '$${city.name}' to JSON", e)
-                        preferences.remove(UserPreferenceKeys.LAST_SELECTED_CITY_JSON) // Очищаем в случае ошибки
+                        Log.e("UserPrefsManager", "Error encoding city '${city.name}' to JSON", e)
+                        preferences.remove(UserPreferenceKeys.LAST_SELECTED_CITY_JSON)
                     }
                 } else {
                     preferences.remove(UserPreferenceKeys.LAST_SELECTED_CITY_JSON)
