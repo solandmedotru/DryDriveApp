@@ -277,14 +277,11 @@ fun CurrentWeatherSection(
                     )
 
                     // 4. StyledWashRecommendation (Плашка "Мыть/не мыть")
-                    val positiveRecommendationKeywords = listOf(
-                        stringResource(R.string.wash_great_day).take(5), 
-                        stringResource(R.string.wash_good_weather_but_cool).take(5) 
-                    )
-                    if (!weatherDetails.washRecommendationText.isNullOrBlank() && 
-                        positiveRecommendationKeywords.any { weatherDetails.washRecommendationText.startsWith(it, ignoreCase = true) } ) {
+                    // Теперь логика определения isPositive убрана отсюда и ожидается из weatherDetails
+                    if (!weatherDetails.washRecommendationText.isNullOrBlank()) {
                         StyledWashRecommendation(
-                            text = weatherDetails.washRecommendationText,
+                            text = weatherDetails.washRecommendationText!!, // Используем текст из модели
+                            isPositive = weatherDetails.isWashRecommendationPositive, // Используем флаг из модели
                             modifier = Modifier.padding(horizontal = dimensionResource(R.dimen.spacing_large))
                         )
                         Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_medium))) 

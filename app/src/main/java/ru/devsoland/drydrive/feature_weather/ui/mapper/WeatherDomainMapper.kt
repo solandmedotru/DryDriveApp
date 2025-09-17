@@ -50,15 +50,23 @@ fun WeatherDomain.toUiModel(context: Context): WeatherDetailsUiModel {
         else -> context.getString(R.string.wash_good_weather_but_cool) 
     }
 
+    // --- НОВАЯ ЛОГИКА ДЛЯ ОПРЕДЕЛЕНИЯ ПОЗИТИВНОСТИ РЕКОМЕНДАЦИИ ---
+    val isWashRecommendationPositive = when (washRecommendationText) {
+        context.getString(R.string.wash_great_day),
+        context.getString(R.string.wash_good_weather_but_cool) -> true
+        else -> false
+    }
+    // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
+
     val feelsLikeValueStr = "${this.feelsLike.roundToInt()}°"
 
     return WeatherDetailsUiModel(
-        // Актуальные поля для нового UI
         cityName = this.cityNameFromApi ?: context.getString(R.string.city_not_found),
         temperature = "${currentTemperature}°",
         weatherConditionDescription = conditionDescription,
         weatherIconRes = getWeatherIconResource(this.weatherConditions.firstOrNull()?.icon),
-        washRecommendationText = washRecommendationText,
+        washRecommendationText = washRecommendationText.ifBlank { null }, // Обработка пустой строки
+        isWashRecommendationPositive = isWashRecommendationPositive,      // ПЕРЕДАЕМ НОВЫЙ ФЛАГ
         feelsLikeValue = feelsLikeValueStr,
         humidity = "${this.humidity}%",
         windSpeed = windInfoForUi, 
@@ -67,8 +75,9 @@ fun WeatherDomain.toUiModel(context: Context): WeatherDetailsUiModel {
         sunset = timeFormat.format(Date((this.sunset + this.timezone) * 1000L)),   
         sunriseEpochMillis = sunriseUtcEpochMillis,
         sunsetEpochMillis = sunsetUtcEpochMillis
-
-        // Присваивание старым полям (feelsLike (старое), tempMinMax, visibility, cloudiness, dt) УДАЛЕНО.
-        // Они получат значения по умолчанию null из определения data class WeatherDetailsUiModel.
+        // Старые поля feelsLike, tempMinMax, visibility, cloudiness, dt УДАЛЕНЫ из конструктора
+        // если они не были явно присвоены выше. Если они есть в data class и имеют значения по умолчанию,
+        // то все будет хорошо. Если их нет или у них нет значений по умолчанию, а они нужны,
+        // их нужно либо добавить в конструктор с присвоением, либо обеспечить значения по умолчанию в data class.
     )
 }

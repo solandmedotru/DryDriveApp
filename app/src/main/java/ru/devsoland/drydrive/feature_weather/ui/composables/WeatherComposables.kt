@@ -1,19 +1,21 @@
 package ru.devsoland.drydrive.feature_weather.ui.composables
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle 
-import androidx.compose.material.icons.filled.NightsStay 
-import androidx.compose.material.icons.filled.Thermostat 
-import androidx.compose.material.icons.filled.Opacity 
-import androidx.compose.material.icons.filled.Air 
-import androidx.compose.material.icons.filled.Compress 
-import androidx.compose.material.icons.filled.WbSunny 
-import androidx.compose.material.icons.filled.Visibility 
-import androidx.compose.material.icons.filled.Cloud 
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Opacity
+import androidx.compose.material.icons.filled.Air
+import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,14 +40,18 @@ import ru.devsoland.drydrive.R
 import ru.devsoland.drydrive.feature_weather.ui.model.WeatherDetailsUiModel
 
 val WashRecommendationGreen = Color(0xFF4CAF50)
+val WashRecommendationRed = Color(0xFFD32F2F)
 
 @Composable
 fun StyledWashRecommendation(
-    text: String,
+    text: String,             // Text to display
+    isPositive: Boolean,      // To determine color and icon
     modifier: Modifier = Modifier,
-    backgroundColor: Color = WashRecommendationGreen,
-    contentColor: Color = Color.White
+    contentColor: Color = Color.White // Default content color for text and icon
 ) {
+    val backgroundColor = if (isPositive) WashRecommendationGreen else WashRecommendationRed
+    val icon = if (isPositive) Icons.Filled.CheckCircle else Icons.Filled.ErrorOutline
+
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(dimensionResource(R.dimen.rounded_corner_large)))
@@ -54,16 +60,16 @@ fun StyledWashRecommendation(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Filled.CheckCircle,
-            contentDescription = stringResource(R.string.recommendation_icon_description),
+            imageVector = icon,
+            contentDescription = text, // Accessibility description can be the text itself
             tint = contentColor,
             modifier = Modifier.size(dimensionResource(R.dimen.icon_size_small))
         )
         Spacer(modifier = Modifier.width(dimensionResource(R.dimen.spacing_small)))
         Text(
-            text = text,
+            text = text, // Display the passed text
             color = contentColor,
-            style = MaterialTheme.typography.labelLarge, 
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold
         )
     }
@@ -83,8 +89,8 @@ fun WeatherInfoGrid(
                 label = stringResource(R.string.details_feels_like),
                 value = weatherDetails.feelsLikeValue ?: "-",
                 modifier = Modifier.weight(1f),
-                iconTint = contentColor, 
-                labelColor = contentColor.copy(alpha = 0.7f), 
+                iconTint = contentColor,
+                labelColor = contentColor.copy(alpha = 0.7f),
                 valueColor = contentColor
             )
             Spacer(modifier = Modifier.width(dimensionResource(R.dimen.spacing_small)))
@@ -126,7 +132,7 @@ fun WeatherInfoGrid(
                 if (weatherDetails.tempMinMax != null) {
                     DetailItem(
                         icon = Icons.Filled.CompareArrows,
-                        label = stringResource(R.string.details_temp_min_max_label_short), 
+                        label = stringResource(R.string.details_temp_min_max_label_short),
                         value = weatherDetails.tempMinMax,
                         modifier = Modifier.weight(1f),
                         iconTint = contentColor,
@@ -139,8 +145,8 @@ fun WeatherInfoGrid(
                 Spacer(modifier = Modifier.width(dimensionResource(R.dimen.spacing_small)))
                 if (weatherDetails.visibility != null) {
                     DetailItem(
-                        icon = Icons.Filled.Visibility, 
-                        label = stringResource(R.string.details_visibility_label_short), 
+                        icon = Icons.Filled.Visibility,
+                        label = stringResource(R.string.details_visibility_label_short),
                         value = weatherDetails.visibility,
                         modifier = Modifier.weight(1f),
                         iconTint = contentColor,
@@ -153,8 +159,8 @@ fun WeatherInfoGrid(
                 Spacer(modifier = Modifier.width(dimensionResource(R.dimen.spacing_small)))
                 if (weatherDetails.cloudiness != null) {
                     DetailItem(
-                        icon = Icons.Filled.Cloud, 
-                        label = stringResource(R.string.details_cloudiness_label_short), 
+                        icon = Icons.Filled.Cloud,
+                        label = stringResource(R.string.details_cloudiness_label_short),
                         value = weatherDetails.cloudiness,
                         modifier = Modifier.weight(1f),
                         iconTint = contentColor,
@@ -177,15 +183,30 @@ fun SunriseSunsetInfo(
     contentColor: Color // Used as a base for day colors
 ) {
     val currentTime = System.currentTimeMillis()
+    val modelSunriseEpoch = weatherDetails.sunriseEpochMillis
+    val modelSunsetEpoch = weatherDetails.sunsetEpochMillis
+
+    Log.d("SunriseSunsetInfo", "CurrentTimeMillis: $currentTime")
+    Log.d("SunriseSunsetInfo", "Model SunriseEpochMillis: $modelSunriseEpoch")
+    Log.d("SunriseSunsetInfo", "Model SunsetEpochMillis: $modelSunsetEpoch")
+
     val sunriseTimeText = weatherDetails.sunrise ?: "-"
     val sunsetTimeText = weatherDetails.sunset ?: "-"
 
     val isCurrentlyNightForLabels: Boolean
-    if (weatherDetails.sunriseEpochMillis != null && weatherDetails.sunsetEpochMillis != null) {
-        isCurrentlyNightForLabels = !(currentTime >= weatherDetails.sunriseEpochMillis && currentTime < weatherDetails.sunsetEpochMillis)
+    if (modelSunriseEpoch != null && modelSunsetEpoch != null) {
+        val conditionSunrisePassed = currentTime >= modelSunriseEpoch
+        val conditionBeforeSunset = currentTime < modelSunsetEpoch
+
+        Log.d("SunriseSunsetInfo", "Check: currentTime ($currentTime) >= modelSunriseEpoch ($modelSunriseEpoch)? -> $conditionSunrisePassed")
+        Log.d("SunriseSunsetInfo", "Check: currentTime ($currentTime) < modelSunsetEpoch ($modelSunsetEpoch)? -> $conditionBeforeSunset")
+
+        isCurrentlyNightForLabels = !(conditionSunrisePassed && conditionBeforeSunset)
     } else {
+        Log.d("SunriseSunsetInfo", "Sunrise or Sunset EpochMillis is null, defaulting isCurrentlyNightForLabels to false")
         isCurrentlyNightForLabels = false // Default to day order if times are missing
     }
+    Log.d("SunriseSunsetInfo", "Calculated isCurrentlyNightForLabels: $isCurrentlyNightForLabels")
 
     val leftLabelText: String
     val leftTimeValue: String
@@ -200,7 +221,7 @@ fun SunriseSunsetInfo(
         leftTimeValue = sunsetTimeText
         leftIconImage = Icons.Filled.NightsStay
         rightLabelText = stringResource(R.string.details_sunrise_label)
-        rightTimeValue = sunriseTimeText 
+        rightTimeValue = sunriseTimeText
         rightIconImage = Icons.Filled.WbSunny
     } else {
         // Day: Sunrise on left, Sunset on right
@@ -213,24 +234,23 @@ fun SunriseSunsetInfo(
     }
 
     Column(modifier = modifier) {
-        // Define colors for DaylightProgressBar
-        val dayGradientStartColor = contentColor.copy(alpha = 0.9f) // Lightest part of day
-        val dayGradientEndColor = contentColor.copy(alpha = 0.5f)   // Darker part of day fill
-        val dayTrackColor = contentColor.copy(alpha = 0.25f) // Dim track for day (background)
+        val dayGradientStartColor = contentColor.copy(alpha = 0.9f)
+        val dayGradientEndColor = contentColor.copy(alpha = 0.5f)
+        val dayTrackColor = contentColor.copy(alpha = 0.25f)
 
-        val nightProgressStartColor = Color(0xFF01579B) // Deeper Dark Blue
-        val nightProgressEndColor = Color(0xFF29B6F6)   // Lighter Sky Blue
-        val nightTrackColor = Color(0xFFB0BEC5)       // Blue Grey for track (background for night)
+        val nightProgressStartColor = Color(0xFF01579B)
+        val nightProgressEndColor = Color(0xFF29B6F6)
+        val nightTrackColor = Color(0xFFB0BEC5)
 
-        if (weatherDetails.sunriseEpochMillis != null && 
-            weatherDetails.sunsetEpochMillis != null &&
+        if (modelSunriseEpoch != null &&
+            modelSunsetEpoch != null &&
             weatherDetails.nextSunriseEpochMillis != null
             ) {
             DaylightProgressBar(
-                sunriseEpochMillis = weatherDetails.sunriseEpochMillis,
-                sunsetEpochMillis = weatherDetails.sunsetEpochMillis,
+                sunriseEpochMillis = modelSunriseEpoch, // Use the logged variable
+                sunsetEpochMillis = modelSunsetEpoch,   // Use the logged variable
                 nextSunriseEpochMillis = weatherDetails.nextSunriseEpochMillis,
-                currentTimeMillis = currentTime, 
+                currentTimeMillis = currentTime,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(dimensionResource(R.dimen.daylight_progress_bar_height)),
@@ -246,27 +266,24 @@ fun SunriseSunsetInfo(
                 .fillMaxWidth()
                 .height(dimensionResource(R.dimen.daylight_progress_bar_height)))
         }
-        Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_medium))) // Spacer below progress bar
+        Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_medium)))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween // Align children to start and end
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             EventTimeRow(
                 icon = leftIconImage,
                 labelText = leftLabelText,
                 timeText = leftTimeValue,
-                // modifier = Modifier.weight(1f), // Removed weight
                 iconTint = contentColor,
                 labelColor = contentColor.copy(alpha = 0.7f),
                 timeColor = contentColor
             )
-            // Spacer(modifier = Modifier.width(dimensionResource(R.dimen.spacing_small))) // Removed spacer
             EventTimeRow(
                 icon = rightIconImage,
                 labelText = rightLabelText,
                 timeText = rightTimeValue,
-                // modifier = Modifier.weight(1f), // Removed weight
                 iconTint = contentColor,
                 labelColor = contentColor.copy(alpha = 0.7f),
                 timeColor = contentColor
@@ -281,9 +298,9 @@ private fun DetailItem(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
-    iconTint: Color, 
-    labelColor: Color, 
-    valueColor: Color  
+    iconTint: Color,
+    labelColor: Color,
+    valueColor: Color
 ) {
     Column(
         modifier = modifier,
@@ -306,18 +323,18 @@ private fun EventTimeRow(
     icon: ImageVector,
     labelText: String,
     timeText: String,
-    modifier: Modifier = Modifier, // Keep modifier parameter for flexibility if needed later
+    modifier: Modifier = Modifier,
     iconTint: Color,
     labelColor: Color,
     timeColor: Color
 ) {
     Row(
-        modifier = modifier, // Apply the passed modifier
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = labelText, 
+            contentDescription = labelText,
             tint = iconTint,
             modifier = Modifier.size(dimensionResource(R.dimen.icon_size_medium))
         )
@@ -337,7 +354,6 @@ private fun EventTimeRow(
     }
 }
 
-
 @Composable
 fun DaylightProgressBar(
     sunriseEpochMillis: Long?,
@@ -345,11 +361,9 @@ fun DaylightProgressBar(
     nextSunriseEpochMillis: Long?,
     currentTimeMillis: Long,
     modifier: Modifier = Modifier,
-    // Day colors
     dayGradientStartColor: Color,
     dayGradientEndColor: Color,
     dayTrackColor: Color,
-    // Night colors
     nightProgressStartColor: Color,
     nightProgressEndColor: Color,
     nightTrackColor: Color
@@ -357,6 +371,8 @@ fun DaylightProgressBar(
     if (sunriseEpochMillis == null || sunsetEpochMillis == null || nextSunriseEpochMillis == null ||
         sunriseEpochMillis >= sunsetEpochMillis || sunsetEpochMillis >= nextSunriseEpochMillis
     ) {
+        // Added log for this guard condition
+        Log.d("DaylightProgressBar", "Guard triggered: SR=$sunriseEpochMillis, SS=$sunsetEpochMillis, NSR=$nextSunriseEpochMillis")
         Spacer(modifier = modifier.height(0.dp))
         return
     }
@@ -371,14 +387,16 @@ fun DaylightProgressBar(
         periodEndMillis = sunsetEpochMillis
     } else {
         isNight = true
-        if (currentTimeMillis >= sunsetEpochMillis) { // Night after current day's sunset
+        if (currentTimeMillis >= sunsetEpochMillis) {
             periodStartMillis = sunsetEpochMillis
             periodEndMillis = nextSunriseEpochMillis
-        } else { // currentTimeMillis < sunriseEpochMillis: Night before current day's sunrise
-            periodStartMillis = sunsetEpochMillis - (24 * 60 * 60 * 1000) // Approx previous sunset
+        } else {
+            periodStartMillis = sunsetEpochMillis - (24 * 60 * 60 * 1000)
             periodEndMillis = sunriseEpochMillis
         }
     }
+    // Log period and isNight determination
+    Log.d("DaylightProgressBar", "CT=$currentTimeMillis, Period: $periodStartMillis - $periodEndMillis, isNight=$isNight")
 
     val currentPeriodDuration = remember(periodStartMillis, periodEndMillis) {
         (periodEndMillis - periodStartMillis).coerceAtLeast(1)
@@ -406,27 +424,27 @@ fun DaylightProgressBar(
     BoxWithConstraints(modifier = modifier) {
         val barHeight = this.maxHeight
         val barWidth = this.maxWidth
-        
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(barHeight)
                 .clip(RoundedCornerShape(barHeight / 2))
-                .background(trackBrush) 
+                .background(trackBrush)
         )
         Box(
             modifier = Modifier
                 .fillMaxHeight()
                 .width(barWidth * progressRatio)
                 .clip(RoundedCornerShape(barHeight / 2))
-                .background(progressBrush) 
+                .background(progressBrush)
         )
     }
 }
 
 @Composable
 fun WeatherDetails(
-    weatherDetails: WeatherDetailsUiModel, 
+    weatherDetails: WeatherDetailsUiModel,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -437,7 +455,7 @@ fun WeatherDetails(
             text = weatherDetails.cityName ?: "",
             style = TextStyle(
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = dimensionResource(R.dimen.font_size_large_title).value.sp, 
+                fontSize = dimensionResource(R.dimen.font_size_large_title).value.sp,
                 fontWeight = FontWeight.Bold
             ),
             modifier = Modifier.padding(bottom = dimensionResource(R.dimen.spacing_small))
@@ -454,15 +472,15 @@ fun WeatherDetails(
             }
             Column {
                 Text(
-                    text = weatherDetails.temperature ?: "", 
+                    text = weatherDetails.temperature ?: "",
                     style = TextStyle(
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = dimensionResource(R.dimen.font_size_huge_title).value.sp, 
+                        fontSize = dimensionResource(R.dimen.font_size_huge_title).value.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 )
                 Text(
-                    text = weatherDetails.weatherConditionDescription ?: "", 
+                    text = weatherDetails.weatherConditionDescription ?: "",
                     style = TextStyle(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = dimensionResource(R.dimen.font_size_title).value.sp,
