@@ -1,15 +1,22 @@
 package ru.devsoland.drydrive.feature_weather.ui.composables
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize // Для анимации изменения размера
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items // Используем items с ключом
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Air // Ветер
+import androidx.compose.material.icons.filled.Cloud // Облачность
+import androidx.compose.material.icons.filled.Compress // Давление
+import androidx.compose.material.icons.filled.Grain // Осадки
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Opacity // Влажность (альтернатива WaterDrop)
+import androidx.compose.material.icons.filled.Thermostat // Ощущается как
+import androidx.compose.material.icons.filled.Visibility // Видимость
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -22,37 +29,36 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.devsoland.drydrive.R
-// ИМПОРТИРУЕМ НОВУЮ UI МОДЕЛЬ
 import ru.devsoland.drydrive.feature_weather.ui.model.ForecastCardUiModel
 
 @Composable
 fun DailyForecastRow(
-    forecastItems: List<ForecastCardUiModel>, // Принимаем List<ForecastCardUiModel>
+    forecastItems: List<ForecastCardUiModel>,
     modifier: Modifier = Modifier
 ) {
     if (forecastItems.isEmpty()) {
-        // Можно отобразить заглушку или ничего, если список пуст
-        // Text(stringResource(R.string.forecast_data_not_available), modifier = modifier.padding(all = dimensionResource(R.dimen.spacing_medium)))
         return
     }
     LazyRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_medium)), // Уменьшил немного для плотности
+        horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_medium)),
         contentPadding = PaddingValues(horizontal = dimensionResource(R.dimen.padding_medium))
     ) {
         items(
             items = forecastItems,
-            key = { item -> item.id } // Используем id из UI модели как ключ
+            key = { item -> item.id }
         ) { uiModel ->
             ForecastDayCard(
                 uiModel = uiModel
-                // isHighlighted передается внутри uiModel
             )
         }
     }
@@ -68,23 +74,29 @@ fun ForecastDayCard(
     val cardContainerColor = if (uiModel.isHighlighted) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        MaterialTheme.colorScheme.surface // Используем surface для обычной карточки, как в новой теме
     }
     val cardContentColor = if (uiModel.isHighlighted) {
         MaterialTheme.colorScheme.onPrimaryContainer
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        MaterialTheme.colorScheme.onSurface // Соответственно onSurface
+    }
+
+    val cardWidthModifier = if (isExpanded) {
+        Modifier.fillMaxWidth()
+    } else {
+        Modifier.width(dimensionResource(R.dimen.forecast_card_width_expanded))
     }
 
     Card(
-        shape = RoundedCornerShape(dimensionResource(R.dimen.corner_radius_large)), // Немного увеличил радиус
+        shape = RoundedCornerShape(dimensionResource(R.dimen.corner_radius_large)),
         colors = CardDefaults.cardColors(
             containerColor = cardContainerColor,
             contentColor = cardContentColor
         ),
         modifier = modifier
-            .width(dimensionResource(R.dimen.forecast_card_width_expanded)) // Можно задать ширину для раскрытой карточки
-            .animateContentSize() // Анимируем изменение размера карточки
+            .then(cardWidthModifier)
+            .animateContentSize()
             .clickable { isExpanded = !isExpanded }
     ) {
         Column(
@@ -93,7 +105,6 @@ fun ForecastDayCard(
                 .padding(dimensionResource(R.dimen.spacing_medium)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- Свернутый вид (основная информация + стрелка) ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -101,73 +112,161 @@ fun ForecastDayCard(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_small)),
-                    modifier = Modifier.weight(1f) // Чтобы основной контент занимал место
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = uiModel.dayShort,
-                        style = MaterialTheme.typography.bodyMedium, // Используем стили темы
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = cardContentColor
                     )
                     Icon(
                         painter = painterResource(id = uiModel.iconRes),
                         contentDescription = stringResource(R.string.forecast_icon_description_template, uiModel.dayShort),
-                        modifier = Modifier.size(dimensionResource(R.dimen.icon_size_medium_large)) // Чуть больше иконка
+                        modifier = Modifier.size(dimensionResource(R.dimen.icon_size_medium_large)),
+                        tint = cardContentColor
                     )
                     Text(
                         text = uiModel.temperature,
-                        style = MaterialTheme.typography.titleMedium, // Используем стили темы
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = cardContentColor
                     )
                 }
                 Icon(
                     imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                     contentDescription = if (isExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand),
-                    modifier = Modifier.size(dimensionResource(R.dimen.icon_size_standard))
+                    modifier = Modifier.size(dimensionResource(R.dimen.icon_size_standard)),
+                    tint = cardContentColor.copy(alpha = 0.7f)
                 )
             }
 
-            // --- Раскрытый вид (с анимацией) ---
             AnimatedVisibility(visible = isExpanded) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = dimensionResource(R.dimen.spacing_medium)),
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_extra_small))
+                        .padding(top = dimensionResource(R.dimen.spacing_large))
                 ) {
-                    DetailRow(stringResource(R.string.details_weather_description), uiModel.weatherDescription)
-                    Spacer(Modifier.height(dimensionResource(R.dimen.spacing_small))) // Доп. отступ
-                    DetailRow(stringResource(R.string.details_feels_like), uiModel.feelsLike)
-                    DetailRow(stringResource(R.string.details_humidity), uiModel.humidity)
-                    DetailRow(stringResource(R.string.details_pressure_hpa_label), uiModel.pressure)
-                    DetailRow(stringResource(R.string.details_wind_speed_mps_label), uiModel.windInfo)
-                    DetailRow(stringResource(R.string.details_visibility_km_label), uiModel.visibility)
-                    DetailRow(stringResource(R.string.details_clouds), uiModel.clouds)
-                    DetailRow(stringResource(R.string.details_precipitation_probability), uiModel.precipitationProbability)
+                    Text(
+                        text = uiModel.weatherDescription,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = cardContentColor,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = dimensionResource(R.dimen.spacing_large)) // Увеличил отступ под описанием
+                    )
+
+                    // Детали в два столбца
+                    Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
+                        DetailItem(
+                            icon = Icons.Filled.Thermostat,
+                            label = stringResource(R.string.details_feels_like_short),
+                            value = uiModel.feelsLike,
+                            contentColor = cardContentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(dimensionResource(R.dimen.spacing_small))) // Небольшой разделитель между колонками
+                        DetailItem(
+                            icon = Icons.Filled.Opacity,
+                            label = stringResource(R.string.details_humidity_short),
+                            value = uiModel.humidity,
+                            contentColor = cardContentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(dimensionResource(R.dimen.spacing_medium)))
+                    Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
+                        DetailItem(
+                            icon = Icons.Filled.Air,
+                            label = stringResource(R.string.details_wind_label_short),
+                            value = uiModel.windInfo,
+                            contentColor = cardContentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(dimensionResource(R.dimen.spacing_small)))
+                        DetailItem(
+                            icon = Icons.Filled.Compress,
+                            label = stringResource(R.string.details_pressure_label_short),
+                            value = uiModel.pressure,
+                            contentColor = cardContentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(dimensionResource(R.dimen.spacing_medium)))
+                    Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
+                        DetailItem(
+                            icon = Icons.Filled.Visibility,
+                            label = stringResource(R.string.details_visibility_label_short),
+                            value = uiModel.visibility,
+                            contentColor = cardContentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(dimensionResource(R.dimen.spacing_small)))
+                        DetailItem(
+                            icon = Icons.Filled.Cloud,
+                            label = stringResource(R.string.details_clouds_short),
+                            value = uiModel.clouds,
+                            contentColor = cardContentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(dimensionResource(R.dimen.spacing_medium)))
+                     Row(Modifier.fillMaxWidth()) { // Убрано Arrangement.SpaceAround
+                         DetailItem(
+                            icon = Icons.Filled.Grain,
+                            label = stringResource(R.string.details_precipitation_short),
+                            value = uiModel.precipitationProbability,
+                            contentColor = cardContentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(dimensionResource(R.dimen.spacing_small)))
+                        Box(modifier = Modifier.weight(1f)) // Пустой Box для выравнивания, если элементов нечетное количество
+                    }
                 }
             }
         }
     }
 }
 
-// Вспомогательный Composable для строки с деталями
 @Composable
-private fun DetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically // Выравнивание по центру для лучшего вида
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall, // Меньший шрифт для меток
-            color = MaterialTheme.colorScheme.onSurfaceVariant // Менее яркий цвет для меток
+private fun DetailItem(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = modifier.padding(
+            vertical = dimensionResource(R.dimen.spacing_small),
+            horizontal = dimensionResource(R.dimen.spacing_small) // Добавлены горизонтальные отступы
         )
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor.copy(alpha = 0.8f),
+            modifier = Modifier.size(dimensionResource(R.dimen.icon_size_medium))
+        )
+        Spacer(Modifier.height(dimensionResource(R.dimen.spacing_extra_small)))
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium, // Шрифт побольше для значений
+            style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(start = dimensionResource(R.dimen.spacing_small)) // Небольшой отступ слева для значения
+            color = contentColor,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = contentColor.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
         )
     }
 }
+
+// Убедитесь, что строки для коротких меток (например, R.string.details_feels_like_short) 
+// добавлены в ваш файл strings.xml.

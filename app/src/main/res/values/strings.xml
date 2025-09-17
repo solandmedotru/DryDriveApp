@@ -148,5 +148,12 @@
     <string name="bottom_nav_weather">Погода</string>
     <string name="details_weather_description">Подробная погода</string>
     <string name="error_api_key_invalid">API key is invalid or unauthorized. Please check your key.</string>
+    <string name="details_feels_like_short">Ощущается</string>
+    <string name="details_humidity_short">Влажность</string>
+    <string name="details_wind_label_short">Ветер</string>
+    <string name="details_pressure_label_short">Давление</string>
+    <string name="details_visibility_label_short">Видимость</string>
+    <string name="details_clouds_short">Облачность</string>
+    <string name="details_precipitation_short">Осадки</string>
 
 </resources>
