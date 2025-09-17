@@ -3,8 +3,9 @@ package ru.devsoland.drydrive.feature_weather.ui
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.* // Keep existing Box, Column, etc.
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -12,8 +13,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
@@ -27,7 +31,8 @@ import ru.devsoland.drydrive.feature_weather.ui.composables.DailyForecastRow
 import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationInfoDialog
 import ru.devsoland.drydrive.feature_weather.ui.composables.RecommendationsDisplaySection
 import ru.devsoland.drydrive.feature_weather.ui.composables.WeatherDetails
-import ru.devsoland.drydrive.feature_weather.ui.model.WeatherDetailsUiModel
+// Предполагается, что WeatherDetailsUiModel будет обновлена и будет содержать sunriseEpochMillis и sunsetEpochMillis
+import ru.devsoland.drydrive.feature_weather.ui.model.WeatherDetailsUiModel 
 import ru.devsoland.drydrive.ui.theme.CityBackgroundOverlay
 import java.util.Locale
 
@@ -99,7 +104,7 @@ fun WeatherScreenContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState()) // Allow content to scroll if it overflows
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Box(
@@ -164,24 +169,40 @@ fun WeatherScreenContent(
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.weight(1f))
-                        if (uiState.weather != null) {
+                        Spacer(modifier = Modifier.weight(1f)) // Pushes car and progress bar down
+                        
+                        val weatherData = uiState.weather
+                        if (weatherData != null) {
                             Image(
                                 painter = painterResource(id = carImageResId),
                                 contentDescription = carContentDescription,
                                 modifier = Modifier
                                     .fillMaxWidth(0.8f)
                                     .aspectRatio(16f / 9f)
-                                    .align(Alignment.CenterHorizontally)
-                                    .padding(bottom = dimensionResource(R.dimen.spacing_large)),
+                                    .align(Alignment.CenterHorizontally),
                                 contentScale = ContentScale.Fit
                             )
+                            // Check if sunrise and sunset data is available in WeatherDetailsUiModel
+                            if (weatherData.sunriseEpochMillis != null && weatherData.sunsetEpochMillis != null) {
+                                DaylightProgressBar(
+                                    sunriseEpochMillis = weatherData.sunriseEpochMillis,
+                                    sunsetEpochMillis = weatherData.sunsetEpochMillis,
+                                    currentTimeMillis = System.currentTimeMillis(),
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.75f) // Match car width or slightly less
+                                        .height(dimensionResource(R.dimen.daylight_progress_bar_height)) // Create this dimen, e.g., 6.dp or 8.dp
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(top = dimensionResource(R.dimen.spacing_tiny)) // Small space from car
+                                )
+                            }
+                             Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_large))) // Bottom padding for car section
                         }
                     }
                 }
             }
         }
 
+        // Нижняя часть экрана с прогнозом по дням и рекомендациями (остается без изменений)
         if (uiState.recommendations.isNotEmpty()) {
             Column(
                 modifier = Modifier
@@ -245,3 +266,59 @@ fun WeatherScreenContent(
         }
     }
 }
+
+@Composable
+fun DaylightProgressBar(
+    sunriseEpochMillis: Long?,
+    sunsetEpochMillis: Long?,
+    currentTimeMillis: Long,
+    modifier: Modifier = Modifier,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), // Цвет фона полосы
+    progressColor: Color = MaterialTheme.colorScheme.primary // Цвет заполнения прогресса
+) {
+    if (sunriseEpochMillis == null || sunsetEpochMillis == null || sunriseEpochMillis >= sunsetEpochMillis) {
+        // Нечего отображать, если данные некорректны или отсутствуют
+        Spacer(modifier = modifier.height(0.dp)) // Занимаем место, но невидимы, или можно Box(modifier)
+        return
+    }
+
+    val totalDaylightDuration = remember(sunriseEpochMillis, sunsetEpochMillis) {
+        (sunsetEpochMillis - sunriseEpochMillis).coerceAtLeast(1) // Ensure no division by zero or negative
+    }
+    val elapsedDaylight = remember(currentTimeMillis, sunriseEpochMillis) {
+        currentTimeMillis - sunriseEpochMillis
+    }
+    val progressRatio = remember(elapsedDaylight, totalDaylightDuration) {
+        (elapsedDaylight.toFloat() / totalDaylightDuration.toFloat()).coerceIn(0f, 1f)
+    }
+
+    BoxWithConstraints(modifier = modifier) {
+        val barHeight = this.maxHeight
+        val barWidth = this.maxWidth
+
+        // Фон (трек)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(barHeight)
+                .clip(RoundedCornerShape(barHeight / 2)) // Скругленные края
+                .background(trackColor)
+        )
+        // Заполнение (прогресс)
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(barWidth * progressRatio)
+                .clip(RoundedCornerShape(barHeight / 2))
+                .background(progressColor)
+        )
+    }
+}
+
+// TODO: Не забудьте добавить dimension `daylight_progress_bar_height` в ваш файл dimens.xml
+// например, <dimen name="daylight_progress_bar_height">6dp</dimen>
+
+// TODO: Убедитесь, что WeatherDetailsUiModel содержит поля:
+// val sunriseEpochMillis: Long?
+// val sunsetEpochMillis: Long?
+// и что они корректно заполняются в маппере.

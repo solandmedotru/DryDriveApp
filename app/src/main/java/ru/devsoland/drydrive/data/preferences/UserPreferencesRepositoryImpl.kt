@@ -15,7 +15,7 @@ import kotlinx.serialization.json.Json
 import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.common.model.ThemeSetting
 import ru.devsoland.drydrive.domain.model.CityDomain
-import ru.devsoland.drydrive.domain.repository.UserPreferencesRepository // Добавлен импорт
+import ru.devsoland.drydrive.domain.repository.UserPreferencesRepository
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,14 +29,15 @@ object UserPreferenceKeys {
 }
 
 @Singleton
-class UserPreferencesManager @Inject constructor(
+class UserPreferencesRepositoryImpl @Inject constructor( // Переименовано
     @ApplicationContext private val context: Context
-) : UserPreferencesRepository { // Реализуем интерфейс
+) : UserPreferencesRepository {
 
     private val json: Json = Json { ignoreUnknownKeys = true; prettyPrint = false }
+    private val logTag = "UserPrefsRepoImpl" // Новый тег для логов
 
     // --- Языковые настройки ---
-    override val selectedLanguage: Flow<AppLanguage> = context.appPreferencesDataStore.data // Переименовано и override
+    override val selectedLanguage: Flow<AppLanguage> = context.appPreferencesDataStore.data
         .catch { exception ->
             handlePreferenceReadError("language", exception)
             emit(emptyPreferences())
@@ -46,18 +47,18 @@ class UserPreferencesManager @Inject constructor(
             AppLanguage.fromCode(languageCode)
         }
 
-    override suspend fun saveSelectedLanguage(language: AppLanguage) { // override
+    override suspend fun saveSelectedLanguage(language: AppLanguage) {
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 preferences[UserPreferenceKeys.SELECTED_LANGUAGE_CODE] = language.code
             }
         } catch (e: Exception) {
-            Log.e("UserPrefsManager", "Error saving language: ${language.code}", e)
+            Log.e(logTag, "Error saving language: ${language.code}", e) // Обновлен тег
         }
     }
 
     // --- Настройки темы ---
-    override val selectedTheme: Flow<ThemeSetting> = context.appPreferencesDataStore.data // Переименовано и override
+    override val selectedTheme: Flow<ThemeSetting> = context.appPreferencesDataStore.data
         .catch { exception ->
             handlePreferenceReadError("theme", exception)
             emit(emptyPreferences())
@@ -67,23 +68,23 @@ class UserPreferencesManager @Inject constructor(
             try {
                 if (themeName != null) ThemeSetting.valueOf(themeName) else ThemeSetting.SYSTEM
             } catch (e: IllegalArgumentException) {
-                Log.w("UserPrefsManager", "Invalid theme name '$themeName', defaulting to SYSTEM.")
+                Log.w(logTag, "Invalid theme name '$themeName', defaulting to SYSTEM.") // Обновлен тег
                 ThemeSetting.SYSTEM
             }
         }
 
-    override suspend fun saveSelectedTheme(theme: ThemeSetting) { // override
+    override suspend fun saveSelectedTheme(theme: ThemeSetting) {
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 preferences[UserPreferenceKeys.SELECTED_THEME] = theme.name
             }
         } catch (e: Exception) {
-            Log.e("UserPrefsManager", "Error saving theme: ${theme.name}", e)
+            Log.e(logTag, "Error saving theme: ${theme.name}", e) // Обновлен тег
         }
     }
 
     // --- Настройки последнего выбранного города ---
-    override val lastSelectedCity: Flow<CityDomain?> = context.appPreferencesDataStore.data // Переименовано и override
+    override val lastSelectedCity: Flow<CityDomain?> = context.appPreferencesDataStore.data
         .catch { exception ->
             handlePreferenceReadError("last selected city JSON", exception)
             emit(emptyPreferences())
@@ -94,7 +95,7 @@ class UserPreferencesManager @Inject constructor(
                 try {
                     json.decodeFromString<CityDomain>(cityJson)
                 } catch (e: Exception) {
-                    Log.e("UserPrefsManager", "Error decoding last city from JSON: $cityJson", e)
+                    Log.e(logTag, "Error decoding last city from JSON: $cityJson", e) // Обновлен тег
                     null
                 }
             } else {
@@ -102,33 +103,33 @@ class UserPreferencesManager @Inject constructor(
             }
         }
 
-    override suspend fun saveLastSelectedCity(city: CityDomain?) { // override
+    override suspend fun saveLastSelectedCity(city: CityDomain?) {
         try {
             context.appPreferencesDataStore.edit { preferences ->
                 if (city != null) {
                     try {
                         val cityJson = json.encodeToString(city)
                         preferences[UserPreferenceKeys.LAST_SELECTED_CITY_JSON] = cityJson
-                        Log.d("UserPrefsManager", "Saved last city as JSON: ${city.name}")
+                        Log.d(logTag, "Saved last city as JSON: ${city.name}") // Обновлен тег
                     } catch (e: Exception) {
-                        Log.e("UserPrefsManager", "Error encoding city '${city.name}' to JSON", e)
+                        Log.e(logTag, "Error encoding city '${city.name}' to JSON", e) // Обновлен тег
                         preferences.remove(UserPreferenceKeys.LAST_SELECTED_CITY_JSON)
                     }
                 } else {
                     preferences.remove(UserPreferenceKeys.LAST_SELECTED_CITY_JSON)
-                    Log.d("UserPrefsManager", "Cleared last selected city from preferences.")
+                    Log.d(logTag, "Cleared last selected city from preferences.") // Обновлен тег
                 }
             }
         } catch (e: Exception) {
-            Log.e("UserPrefsManager", "Exception while saving last city: ", e)
+            Log.e(logTag, "Exception while saving last city: ", e) // Обновлен тег
         }
     }
 
     private fun handlePreferenceReadError(preferenceName: String, exception: Throwable) {
         if (exception is IOException) {
-            Log.e("UserPrefsManager", "IOException reading $preferenceName preferences.", exception)
+            Log.e(logTag, "IOException reading $preferenceName preferences.", exception) // Обновлен тег
         } else {
-            Log.e("UserPrefsManager", "Unexpected error reading $preferenceName preferences.", exception)
+            Log.e(logTag, "Unexpected error reading $preferenceName preferences.", exception) // Обновлен тег
         }
     }
 }

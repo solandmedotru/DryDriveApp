@@ -25,7 +25,8 @@ import kotlinx.coroutines.runBlocking
 import ru.devsoland.drydrive.common.util.setAppLocale
 import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.common.model.ThemeSetting
-import ru.devsoland.drydrive.data.preferences.UserPreferencesManager
+// import ru.devsoland.drydrive.data.preferences.UserPreferencesManager // Удален импорт
+import ru.devsoland.drydrive.domain.repository.UserPreferencesRepository // Добавлен импорт
 import ru.devsoland.drydrive.di.UserPreferencesEntryPoint
 import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
@@ -35,9 +36,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var userPreferencesManager: UserPreferencesManager // Эта зависимость может остаться, так как UserPreferencesManager реализует репозиторий
-                                                                // и Hilt знает, как его предоставить. Либо можно будет поменять на UserPreferencesRepository.
-                                                                // Для EntryPoint это тоже должно работать.
+    lateinit var userPreferencesRepository: UserPreferencesRepository // ИЗМЕНЕНО: внедряем интерфейс
 
     private val weatherViewModel: WeatherViewModel by viewModels()
     private val tag = "MainActivityLifecycle"
@@ -45,21 +44,21 @@ class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
         Log.d(tag, "attachBaseContext CALLED. Initial locale: ${newBase.resources.configuration.locale}")
 
-        val tempUserPrefsManager: UserPreferencesManager = try {
+        val tempUserPrefsRepository: UserPreferencesRepository = try { // ИЗМЕНЕНО: тип переменной и имя
             val entryPoint = EntryPointAccessors.fromApplication(
                 newBase.applicationContext,
                 UserPreferencesEntryPoint::class.java
             )
-            entryPoint.getUserPreferencesManager()
+            entryPoint.getUserPreferencesRepository() // ИЗМЕНЕНО: вызов метода
         } catch (e: Exception) {
-            Log.e(tag, "Error getting UserPreferencesManager in attachBaseContext: ${e.message}. Using default base context.", e)
+            Log.e(tag, "Error getting UserPreferencesRepository in attachBaseContext: ${e.message}. Using default base context.", e) // ИЗМЕНЕНО: сообщение в логе
             super.attachBaseContext(newBase)
             return
         }
 
         val currentLanguageCode = try {
             runBlocking {
-                tempUserPrefsManager.selectedLanguage.first().code // ИСПРАВЛЕНО
+                tempUserPrefsRepository.selectedLanguage.first().code // ИЗМЕНЕНО: используем новую переменную
             }
         } catch (e: Exception) {
             Log.e(tag, "Error getting language code for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.", e)
@@ -74,12 +73,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            Log.d(tag, "onCreate: Current locales (from resources.configuration): ${resources.configuration.locales.toLanguageTags()}")
-        } else {
-            @Suppress("DEPRECATION")
-            Log.d(tag, "onCreate: Current locale (from resources.configuration): ${resources.configuration.locale}")
-        }
+        Log.d(tag, "onCreate: Current locales (from resources.configuration): ${resources.configuration.locales.toLanguageTags()}")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Log.d(tag, "onCreate: Current AppCompatDelegate locales: ${AppCompatDelegate.getApplicationLocales().toLanguageTags()}")
         }
@@ -94,7 +88,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val currentThemeSetting by userPreferencesManager.selectedTheme.collectAsState( // ИСПРАВЛЕНО
+            val currentThemeSetting by userPreferencesRepository.selectedTheme.collectAsState( // ИЗМЕНЕНО
                 initial = ThemeSetting.SYSTEM
             )
 

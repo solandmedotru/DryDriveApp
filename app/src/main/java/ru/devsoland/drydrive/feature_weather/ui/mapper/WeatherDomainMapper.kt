@@ -15,17 +15,13 @@ import kotlin.math.roundToInt
  * Преобразует доменную модель [WeatherDomain] в UI модель [WeatherDetailsUiModel].
  */
 fun WeatherDomain.toUiModel(context: Context): WeatherDetailsUiModel {
+    // Форматтер для отображения времени восхода/заката в локальной таймзоне пользователя
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
-        // Учитываем таймзону самого устройства для отображения, но время восхода/заката приходит в UTC
-        // Для корректного отображения времени восхода/заката с учетом timezone от API:
-        // val deviceTimeZone = TimeZone.getDefault()
-        // val apiTimeZoneOffsetMillis = this@toUiModel.timezone * 1000L
-        // val apiTimeZone = TimeZone.getTimeZone("GMT").apply { rawOffset = apiTimeZoneOffsetMillis.toInt() }
-        // // Лучше создать отдельный SimpleDateFormat для UTC->Local конвертации с учетом API timezone.
-        // // Пока просто отображаем время как есть, предполагая, что оно уже скорректировано или пользователь поймет.
+        // Комментарии ниже объясняют, что время от API приходит в UTC, а SimpleDateFormat по умолчанию
+        // использует таймзону устройства. Для корректного преобразования UTC в локальное время
+        // с учетом смещения от API (this.timezone), мы прибавляем это смещение к UTC timestamp.
     }
 
-    // Форматирование скорости и направления ветра
     val windDirection = when (this.windDeg) {
         in 0..22 -> context.getString(R.string.wind_dir_n)
         in 23..67 -> context.getString(R.string.wind_dir_ne)
@@ -40,6 +36,11 @@ fun WeatherDomain.toUiModel(context: Context): WeatherDetailsUiModel {
     }
     val windInfo = "${this.windSpeed.roundToInt()} ${context.getString(R.string.unit_mps)} $windDirection"
 
+    // Получаем время восхода и заката в миллисекундах UTC для индикатора прогресса
+    // this.sunrise и this.sunset приходят из WeatherDomain как секунды UTC
+    val sunriseUtcEpochMillis = this.sunrise * 1000L
+    val sunsetUtcEpochMillis = this.sunset * 1000L
+
     return WeatherDetailsUiModel(
         cityName = this.cityNameFromApi,
         temperature = "${this.temperature.roundToInt()}°",
@@ -50,15 +51,18 @@ fun WeatherDomain.toUiModel(context: Context): WeatherDetailsUiModel {
         visibility = "${this.visibility / 1000} ${context.getString(R.string.unit_km)}",
         windSpeed = windInfo,
         cloudiness = "${this.cloudiness}%",
-        // Для корректного отображения времени восхода/заката с учетом смещения timezone от API:
-        // Нужно преобразовать this.sunrise (UTC timestamp) + this.timezone (смещение в секундах) в локальное время.
-        // Пока простой вариант:
+        // Строки sunrise/sunset для отображения в UI (локальное время)
+        // this.timezone - это смещение от UTC в секундах, предоставленное API
         sunrise = timeFormat.format(Date((this.sunrise + this.timezone) * 1000L)),
         sunset = timeFormat.format(Date((this.sunset + this.timezone) * 1000L)),
         weatherConditionDescription = this.weatherConditions.firstOrNull()?.description?.replaceFirstChar { 
             if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() 
         } ?: "",
         weatherIconRes = getWeatherIconResource(this.weatherConditions.firstOrNull()?.icon),
-        dt = this.sunrise // Используем dt из WeatherDomain, который соответствует dt из CurrentWeatherResponseDto
+        dt = this.sunrise, // Используем dt из WeatherDomain
+        
+        // Новые поля для индикатора прогресса (миллисекунды UTC)
+        sunriseEpochMillis = sunriseUtcEpochMillis,
+        sunsetEpochMillis = sunsetUtcEpochMillis
     )
 }

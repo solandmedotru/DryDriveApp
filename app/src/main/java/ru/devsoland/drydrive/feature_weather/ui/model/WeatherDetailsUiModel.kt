@@ -26,7 +26,9 @@ data class WeatherDetailsUiModel(
     val sunset: String,     // Например, "20:45"
     val weatherConditionDescription: String,
     @DrawableRes val weatherIconRes: Int,
-    val dt: Long // Исходное время расчета данных, для возможного использования (например, в рекомендациях)
+    val dt: Long, // Исходное время расчета данных, для возможного использования (например, в рекомендациях)
+    val sunriseEpochMillis: Long?,
+    val sunsetEpochMillis: Long?
 )
 
 /**
