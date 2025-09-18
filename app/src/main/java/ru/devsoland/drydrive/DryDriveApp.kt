@@ -27,11 +27,11 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.launch
-import ru.devsoland.drydrive.common.model.AppLanguage // *** ДОБАВЛЕН ИМПОРТ ***
+import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.common.ui.navigation.BottomNavItem
 import ru.devsoland.drydrive.common.ui.navigation.DryDriveBottomNavigationBar
 import ru.devsoland.drydrive.common.ui.navigation.DryDriveTopAppBar
-import ru.devsoland.drydrive.feature_map.ui.MapScreenPlaceholder
+import ru.devsoland.drydrive.feature_map.ui.MapScreen // *** ИЗМЕНЕН ИМПОРТ ***
 import ru.devsoland.drydrive.feature_settings.ui.SettingsScreen
 import ru.devsoland.drydrive.feature_weather.ui.WeatherEvent
 import ru.devsoland.drydrive.feature_weather.ui.WeatherScreen
@@ -86,13 +86,15 @@ fun DryDriveApp(
         }
     }
 
-    // *** Лямбда для SettingsScreen ***
     val handleLanguageConfirmed: (AppLanguage) -> Unit = {
         selectedLanguage -> weatherViewModel.onEvent(WeatherEvent.ChangeLanguage(selectedLanguage))
     }
 
+    val isMapScreenSelected = selectedItemIndex == 1
+
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = !isMapScreenSelected, // <<< ВОТ ИЗМЕНЕНИЕ: отключаем жесты на экране карты
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.systemBarsPadding(),
@@ -147,12 +149,12 @@ fun DryDriveApp(
                         modifier = Modifier.padding(paddingValues).fillMaxSize(),
                         viewModel = weatherViewModel
                     )
-                    1 -> MapScreenPlaceholder(
+                    1 -> MapScreen( // *** ИЗМЕНЕН ВЫЗОВ ФУНКЦИИ ***
                         modifier = Modifier.padding(paddingValues).fillMaxSize()
                     )
                     2 -> SettingsScreen(
                         modifier = Modifier.padding(paddingValues).fillMaxSize(),
-                        onLanguageConfirmed = handleLanguageConfirmed // *** ПЕРЕДАЕМ ЛЯМБДУ ***
+                        onLanguageConfirmed = handleLanguageConfirmed
                     )
                 }
             }

@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "ru.devsoland.drydrive"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -25,6 +25,7 @@ android {
         }
 
         buildConfigField("String", "WEATHER_API_KEY", "\"${project.findProperty("WEATHER_API_KEY") ?: "your_api_key_here"}\"")
+        buildConfigField("String", "YANDEX_MAPS_API_KEY", "\"${project.findProperty("YANDEX_MAPS_API_KEY") ?: "your_api_key_here"}\"")
     }
 
     buildTypes {
@@ -34,6 +35,7 @@ android {
         }
         debug {
             buildConfigField("String", "WEATHER_API_KEY", "\"${project.findProperty("WEATHER_API_KEY") ?: "your_api_key_here"}\"")
+            manifestPlaceholders["YANDEX_MAPS_API_KEY"] = project.findProperty("YANDEX_MAPS_API_KEY") ?: "КЛЮЧ_ЗАГЛУШКА_ЕСЛИ_НЕ_НАЙДЕН"
         }
     }
 
@@ -77,7 +79,8 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.3.2")
     implementation("androidx.navigation:navigation-compose:2.9.4")
     implementation("androidx.compose.ui:ui-tooling:1.9.1")
-    implementation(libs.androidx.compose.foundation)
+    implementation("androidx.compose.foundation:foundation:1.9.1")
+
     debugImplementation("androidx.compose.ui:ui-tooling-data:1.9.1")
 
     // Retrofit + OkHttp + Serialization
@@ -111,6 +114,8 @@ dependencies {
 
     // LeakCanary (только для debug)
     debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
+
+    implementation("com.yandex.android:maps.mobile:4.22.0-full")
 
     // Тестовые зависимости
     testImplementation("junit:junit:4.13.2")
