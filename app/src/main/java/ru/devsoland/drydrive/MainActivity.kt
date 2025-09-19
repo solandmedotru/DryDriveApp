@@ -25,8 +25,7 @@ import kotlinx.coroutines.runBlocking
 import ru.devsoland.drydrive.common.util.setAppLocale
 import ru.devsoland.drydrive.common.model.AppLanguage
 import ru.devsoland.drydrive.common.model.ThemeSetting
-// import ru.devsoland.drydrive.data.preferences.UserPreferencesManager // Удален импорт
-import ru.devsoland.drydrive.domain.repository.UserPreferencesRepository // Добавлен импорт
+import ru.devsoland.drydrive.domain.repository.UserPreferencesRepository
 import ru.devsoland.drydrive.di.UserPreferencesEntryPoint
 import ru.devsoland.drydrive.feature_weather.ui.WeatherViewModel
 import ru.devsoland.drydrive.ui.theme.DryDriveTheme
@@ -36,46 +35,68 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var userPreferencesRepository: UserPreferencesRepository // ИЗМЕНЕНО: внедряем интерфейс
+    lateinit var userPreferencesRepository: UserPreferencesRepository
 
     private val weatherViewModel: WeatherViewModel by viewModels()
     private val tag = "MainActivityLifecycle"
 
     override fun attachBaseContext(newBase: Context) {
-        Log.d(tag, "attachBaseContext CALLED. Initial locale: ${newBase.resources.configuration.locale}")
+        Log.d(
+            tag,
+            "attachBaseContext CALLED. Initial locale: ${newBase.resources.configuration.locales}"
+        )
 
-        val tempUserPrefsRepository: UserPreferencesRepository = try { // ИЗМЕНЕНО: тип переменной и имя
+        val tempUserPrefsRepository: UserPreferencesRepository = try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 newBase.applicationContext,
                 UserPreferencesEntryPoint::class.java
             )
-            entryPoint.getUserPreferencesRepository() // ИЗМЕНЕНО: вызов метода
+            entryPoint.getUserPreferencesRepository()
         } catch (e: Exception) {
-            Log.e(tag, "Error getting UserPreferencesRepository in attachBaseContext: ${e.message}. Using default base context.", e) // ИЗМЕНЕНО: сообщение в логе
+            Log.e(
+                tag,
+                "Error getting UserPreferencesRepository in attachBaseContext: ${e.message}. Using default base context.",
+                e
+            )
             super.attachBaseContext(newBase)
             return
         }
 
         val currentLanguageCode = try {
             runBlocking {
-                tempUserPrefsRepository.selectedLanguage.first().code // ИЗМЕНЕНО: используем новую переменную
+                tempUserPrefsRepository.selectedLanguage.first().code
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error getting language code for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.", e)
+            Log.e(
+                tag,
+                "Error getting language code for attachBaseContext: ${e.message}. Defaulting to SYSTEM code.",
+                e
+            )
             AppLanguage.SYSTEM.code
         }
 
         Log.d(tag, "Applying language code: '$currentLanguageCode' in attachBaseContext.")
         val contextWithLocale = newBase.setAppLocale(currentLanguageCode)
         super.attachBaseContext(contextWithLocale)
-        Log.d(tag, "attachBaseContext FINISHED. Applied locale: ${contextWithLocale.resources.configuration.locale}")
+        Log.d(
+            tag,
+            "attachBaseContext FINISHED. Applied locale: ${contextWithLocale.resources.configuration.locales}"
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(tag, "onCreate: Current locales (from resources.configuration): ${resources.configuration.locales.toLanguageTags()}")
+        Log.d(
+            tag,
+            "onCreate: Current locales (from resources.configuration): ${resources.configuration.locales.toLanguageTags()}"
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Log.d(tag, "onCreate: Current AppCompatDelegate locales: ${AppCompatDelegate.getApplicationLocales().toLanguageTags()}")
+            Log.d(
+                tag,
+                "onCreate: Current AppCompatDelegate locales: ${
+                    AppCompatDelegate.getApplicationLocales().toLanguageTags()
+                }"
+            )
         }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -88,7 +109,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val currentThemeSetting by userPreferencesRepository.selectedTheme.collectAsState( // ИЗМЕНЕНО
+            val currentThemeSetting by userPreferencesRepository.selectedTheme.collectAsState(
                 initial = ThemeSetting.SYSTEM
             )
 

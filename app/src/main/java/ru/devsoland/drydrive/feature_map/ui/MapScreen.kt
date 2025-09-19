@@ -1,55 +1,63 @@
 package ru.devsoland.drydrive.feature_map.ui
 
 import android.Manifest
+import android.content.Intent // Added
 import android.content.pm.PackageManager
+import android.net.Uri // Added
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+// import androidx.compose.foundation.Image // Removed as photo is gone
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable // Might be implicitly imported or add if needed
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+// import androidx.compose.foundation.lazy.items // Removed as review items are gone
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+// import androidx.compose.material.icons.filled.Call // Removed
+// import androidx.compose.material.icons.filled.LocationOn // Removed
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+// import androidx.compose.material.icons.filled.Star // Removed
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+// import androidx.compose.ui.draw.clip // Removed as photo is gone
+import androidx.compose.ui.graphics.Color
+// import androidx.compose.ui.layout.ContentScale // Removed as photo is gone
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+// import androidx.compose.ui.res.painterResource // Removed as photo is gone
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yandex.mapkit.Animation
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.layers.ObjectEvent
-import com.yandex.mapkit.map.CameraListener
-import com.yandex.mapkit.map.CameraPosition
-import com.yandex.mapkit.map.CameraUpdateReason
-import com.yandex.mapkit.map.Map
-import com.yandex.mapkit.map.MapObjectCollection
-import com.yandex.mapkit.map.PlacemarkMapObject
+import com.yandex.mapkit.map.*
 import com.yandex.mapkit.mapview.MapView
 import com.yandex.mapkit.user_location.UserLocationLayer
 import com.yandex.mapkit.user_location.UserLocationObjectListener
 import com.yandex.mapkit.user_location.UserLocationView
 import com.yandex.runtime.image.ImageProvider
-import ru.devsoland.drydrive.R
+import kotlinx.coroutines.launch
+import ru.devsoland.drydrive.R // Keep for ic_car_wash_marker
 
 private const val TAG = "MapScreen"
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     modifier: Modifier = Modifier,
@@ -61,25 +69,34 @@ fun MapScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val mapView = remember {
+        Log.d(TAG, "MapView being remembered.")
         MapView(context).apply {}
     }
-
-    val mapObjects: MapObjectCollection? = remember { mapView.map.mapObjects }
-    var searchResultPlacemarks = remember { mutableListOf<PlacemarkMapObject>() }
-
-    var locationPermissionGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        )
+    var mapObjectCollection: MapObjectCollection? by remember { mutableStateOf(null) }
+    val placemarkIcon = remember(context) {
+        ImageProvider.fromResource(context, R.drawable.ic_car_wash_marker)
     }
 
-    var initialCameraMoveCompleted by remember { mutableStateOf(false) } // Changed from initialSetupDone
+    var userLocationLayerState by remember { mutableStateOf<UserLocationLayer?>(null) }
+    var locationPermissionGranted by remember {
+        val initialState = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        Log.d(TAG, "Initial locationPermissionGranted state: $initialState")
+        mutableStateOf(initialState)
+    }
+    var initialCameraMoveCompleted by remember { mutableStateOf(false) }
     var userInitiatedMapMove by remember { mutableStateOf(false) }
     var currentUserLocationPoint by remember { mutableStateOf<Point?>(null) }
+
+    var selectedCarWashDetails by remember { mutableStateOf<FakeCarWashDetails?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    val searchState by mapViewModel.searchState.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted ->
+            Log.d(TAG, "PermissionLauncher onResult: granted = $granted")
             if (granted) {
                 locationPermissionGranted = true
                 Toast.makeText(context, "Разрешение на геолокацию получено", Toast.LENGTH_SHORT).show()
@@ -90,21 +107,38 @@ fun MapScreen(
         }
     )
 
+    val mapObjectTapListener = remember {
+        MapObjectTapListener { mapObject, point ->
+            val carWashId = mapObject.userData as? String
+            if (carWashId != null) {
+                Log.d(TAG, "Tapped on placemark with ID: $carWashId, Point: $point")
+                val currentSearchState = mapViewModel.searchState.value
+                if (currentSearchState is SearchState.Success) {
+                    val foundItem = currentSearchState.items.find { it.id == carWashId }
+                    if (foundItem != null) {
+                        selectedCarWashDetails = foundItem.fullDetails
+                        scope.launch { sheetState.show() }
+                    } else {
+                        Log.w(TAG, "Car wash with ID $carWashId not found in current search results.")
+                        Toast.makeText(context, "Детали для мойки не найдены", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Log.w(TAG, "Search state is not Success, cannot show details.")
+                    Toast.makeText(context, "Данные поиска не загружены", Toast.LENGTH_SHORT).show()
+                }
+                return@MapObjectTapListener true
+            }
+            false
+        }
+    }
+
     val cameraListener = remember {
-        CameraListener { map, _, reason, finished ->
+        CameraListener { map, _, cameraUpdateReason, finished ->
             if (finished) {
-                when (reason) {
-                    CameraUpdateReason.GESTURES -> {
-                        Log.d(TAG, "CameraListener: GESTURES finished. Searching car washes. Setting userInitiatedMapMove = true")
-                        mapViewModel.searchCarWashes(map.visibleRegion)
-                        userInitiatedMapMove = true
-                    }
-                    CameraUpdateReason.APPLICATION -> {
-                        Log.d(TAG, "CameraListener: APPLICATION finished. Current region: ${map.visibleRegion.topLeft}")
-                    }
-                    else -> {
-                        // Log.d(TAG, "CameraListener: OTHER reason finished ($reason).")
-                    }
+                userInitiatedMapMove = cameraUpdateReason == CameraUpdateReason.GESTURES
+                if (userInitiatedMapMove || !initialCameraMoveCompleted) {
+                    Log.d(TAG, "CameraListener: Requesting car washes for region: ${map.visibleRegion}")
+                    mapViewModel.searchCarWashes(map.visibleRegion)
                 }
             }
         }
@@ -113,171 +147,113 @@ fun MapScreen(
     val userLocationObjectListener = remember {
         object : UserLocationObjectListener {
             override fun onObjectAdded(userLocationView: UserLocationView) {
-                Log.i(TAG, "!!! USER_LOCATION_LISTENER: onObjectAdded - ENTERED !!!")
-                val userPoint = userLocationView.arrow.geometry // Or consider pin, accuracyCircle as fallbacks
-                Log.d(TAG, "USER_LOCATION_LISTENER: onObjectAdded CALLED! UserPoint: (${userPoint.latitude}, ${userPoint.longitude}), initialCMCompleted: $initialCameraMoveCompleted")
+                val userPoint = userLocationView.arrow.geometry
                 if (userPoint.latitude != 0.0 || userPoint.longitude != 0.0) {
                     currentUserLocationPoint = userPoint
-                    // onObjectUpdated will likely be called immediately after, which will handle camera logic
+                    if (!initialCameraMoveCompleted) {
+                        mapView.mapWindow.map.move(
+                            CameraPosition(userPoint, 15.0f, 0.0f, 0.0f),
+                            Animation(Animation.Type.SMOOTH, 1.0f)
+                        ) { completed ->
+                            if (completed) initialCameraMoveCompleted = true
+                            mapView.mapWindow.map.visibleRegion.let { mapViewModel.searchCarWashes(it) }
+                        }
+                    }
+                } else {
+                    Log.w(TAG, "USER_LOCATION_LISTENER: onObjectAdded - Received zero coordinates.")
                 }
             }
-
-            override fun onObjectRemoved(view: UserLocationView) {
-                Log.i(TAG, "!!! USER_LOCATION_LISTENER: onObjectRemoved - ENTERED !!!")
-                Log.d(TAG, "USER_LOCATION_LISTENER: onObjectRemoved CALLED!")
-            }
-
+            override fun onObjectRemoved(view: UserLocationView) {}
             override fun onObjectUpdated(view: UserLocationView, event: ObjectEvent) {
-                Log.i(TAG, "!!! USER_LOCATION_LISTENER: onObjectUpdated - ENTERED !!!")
                 val arrowPoint = view.arrow.geometry
                 val pinPoint = view.pin.geometry
                 val pointToUse: Point? = if (arrowPoint.latitude != 0.0 || arrowPoint.longitude != 0.0) arrowPoint
-                                        else if (pinPoint.latitude != 0.0 || pinPoint.longitude != 0.0) pinPoint
-                                        else null
-
+                else if (pinPoint.latitude != 0.0 || pinPoint.longitude != 0.0) pinPoint
+                else null
                 if (pointToUse != null) {
                     currentUserLocationPoint = pointToUse
-                }
-                
-                Log.d(TAG, "USER_LOCATION_LISTENER: onObjectUpdated. Point: $currentUserLocationPoint, initialCMCompleted: $initialCameraMoveCompleted, userMovedMap: $userInitiatedMapMove")
-
-                if (currentUserLocationPoint != null) {
-                    val currentNonNullUserPoint = currentUserLocationPoint!!
-
-                    if (!initialCameraMoveCompleted) {
-                        Log.i(TAG, "Attempting INITIAL camera move to UserPoint: (${currentNonNullUserPoint.latitude}, ${currentNonNullUserPoint.longitude}) with zoom 15.0f")
-                        userInitiatedMapMove = false // This is an automatic initial move
-
-                        mapView.map.move(
-                            CameraPosition(currentNonNullUserPoint, 15.0f, 0.0f, 0.0f),
-                            Animation(Animation.Type.SMOOTH, 1.0f),
-                            object : Map.CameraCallback {
-                                override fun onMoveFinished(completed: Boolean) {
-                                    if (completed) {
-                                        Log.i(TAG, "CameraCallback (Initial): Initial move FINISHED. Searching car washes.")
-                                        mapViewModel.searchCarWashes(mapView.map.visibleRegion)
-                                        initialCameraMoveCompleted = true
-                                    } else {
-                                        Log.w(TAG, "CameraCallback (Initial): Initial move NOT completed. Will retry on next update.")
-                                        // initialCameraMoveCompleted remains false, so this block will be tried again.
-                                    }
-                                }
-                            }
-                        )
-                    } else if (initialCameraMoveCompleted && !userInitiatedMapMove) {
-                        // Initial move/zoom has completed. Now we are in "follow user" mode.
-                        Log.d(TAG, "USER_LOCATION_LISTENER: onObjectUpdated - FOLLOWING user.")
-                        val currentZoom = mapView.map.cameraPosition.zoom 
-                        mapView.map.move(
-                            CameraPosition(currentNonNullUserPoint, currentZoom, 0.0f, 0.0f),
-                            Animation(Animation.Type.SMOOTH, 0.5f),
-                            null 
+                    if (initialCameraMoveCompleted && !userInitiatedMapMove) {
+                        val currentZoom = mapView.mapWindow.map.cameraPosition.zoom
+                        mapView.mapWindow.map.move(
+                            CameraPosition(pointToUse, currentZoom, 0.0f, 0.0f),
+                            Animation(Animation.Type.SMOOTH, 0.5f), null
                         )
                     }
-                    // If userInitiatedMapMove is true, we do nothing here, respecting user's manual pan/zoom.
-                } else {
-                    Log.w(TAG, "USER_LOCATION_LISTENER: onObjectUpdated - currentUserLocationPoint is NULL.")
                 }
             }
         }
     }
-    
+
     DisposableEffect(lifecycleOwner, mapView) {
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> {
-                    MapKitFactory.getInstance().onStart()
-                    mapView.onStart()
-                }
-                Lifecycle.Event.ON_STOP -> {
-                    mapView.onStop()
-                    MapKitFactory.getInstance().onStop()
-                }
+                Lifecycle.Event.ON_START -> MapKitFactory.getInstance().onStart().also { mapView.onStart() }
+                Lifecycle.Event.ON_STOP -> mapView.onStop().also { MapKitFactory.getInstance().onStop() }
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
-        mapView.map.addCameraListener(cameraListener)
+        mapView.mapWindow.map.addCameraListener(cameraListener)
+        val moc = mapView.mapWindow.map.mapObjects.addCollection()
+        mapObjectCollection = moc
+        moc.addTapListener(mapObjectTapListener)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
-            mapView.map.removeCameraListener(cameraListener)
+            mapView.mapWindow.map.removeCameraListener(cameraListener)
         }
     }
 
-    LaunchedEffect(locationPermissionGranted, mapView, mapViewModel, userLocationObjectListener) {
-        Log.d(TAG, "MapScreen LaunchedEffect CALLED. locationPermissionGranted: $locationPermissionGranted")
-
+    LaunchedEffect(locationPermissionGranted, mapView, userLocationObjectListener) {
         if (locationPermissionGranted) {
-            var userLocationLayer: UserLocationLayer? = null 
             try {
-                Log.d(TAG, "LaunchedEffect: Trying to setup UserLocationLayer.")
                 MapKitFactory.getInstance().resetLocationManagerToDefault()
-                Log.d(TAG, "LaunchedEffect: resetLocationManagerToDefault() CALLED.")
-
-                userLocationLayer = MapKitFactory.getInstance().createUserLocationLayer(mapView.mapWindow)
-                if (userLocationLayer == null) {
-                    Log.e(TAG, "LaunchedEffect: userLocationLayer is NULL after creation!")
-                    return@LaunchedEffect 
-                }
-                userLocationLayer.isVisible = true
-                Log.d(TAG, "LaunchedEffect: UserLocationLayer properties set.")
-
-                userLocationLayer.setObjectListener(userLocationObjectListener)
-                Log.d(TAG, "LaunchedEffect: UserLocationLayer Listener SET.")
+                val newLayer = MapKitFactory.getInstance().createUserLocationLayer(mapView.mapWindow)
+                newLayer.isVisible = true
+                newLayer.isHeadingModeActive = true
+                newLayer.setObjectListener(userLocationObjectListener)
+                userLocationLayerState = newLayer
             } catch (e: Exception) {
                 Log.e(TAG, "Error in UserLocationLayer setup", e)
-            }
-
-            mapViewModel.searchState.collect { state ->
-                when (state) {
-                    is SearchState.Loading -> {
-                        Log.d(TAG, "SearchState: Loading...")
-                    }
-                    is SearchState.Success -> {
-                        Log.d(TAG, "SearchState: Success! Found ${state.items.size} car washes.")
-                        searchResultPlacemarks.forEach { it.parent?.remove(it) }
-                        searchResultPlacemarks.clear()
-
-                        val imageProvider = try {
-                            ImageProvider.fromResource(context, R.drawable.ic_car_wash_marker) 
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error loading marker icon", e)
-                            null
-                        }
-
-                        state.items.forEach { searchResultItem ->
-                            val placemark = mapObjects?.addPlacemark()?.apply {
-                                geometry = searchResultItem.point
-                                if (imageProvider != null) {
-                                    setIcon(imageProvider)
-                                }
-                                userData = searchResultItem 
-                                addTapListener { mapObject, point ->
-                                    val tappedItem = mapObject.userData as? SearchResultItem
-                                    Log.d(TAG, "Tapped on car wash: ${tappedItem?.name}")
-                                    Toast.makeText(context, "Автомойка: ${tappedItem?.name}", Toast.LENGTH_SHORT).show()
-                                    true
-                                }
-                            }
-                            if ( placemark != null) {
-                                searchResultPlacemarks.add(placemark)
-                            }
-                        }
-                    }
-                    is SearchState.Error -> {
-                        Log.e(TAG, "SearchState: Error during car wash search!")
-                        Toast.makeText(context, "Ошибка поиска автомоек", Toast.LENGTH_SHORT).show()
-                    }
-                    SearchState.Off -> {
-                        Log.d(TAG, "SearchState: Off")
-                    }
-                }
+                userLocationLayerState = null
             }
         } else {
-            Log.d(TAG, "LaunchedEffect: Location permission NOT granted. Requesting permission...")
+            userLocationLayerState?.isVisible = false
+            userLocationLayerState = null
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                 permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+    }
+
+    LaunchedEffect(searchState, mapObjectCollection, placemarkIcon) {
+        val moc = mapObjectCollection ?: return@LaunchedEffect
+        when (val state = searchState) {
+            is SearchState.Success -> {
+                moc.clear()
+                if (state.items.isEmpty()) {
+                    Log.d(TAG, "Search successful, but no items found to display.")
+                } else {
+                    state.items.forEach { item ->
+                        val placemark = moc.addPlacemark()
+                        placemark.geometry = item.point
+                        placemark.setIcon(placemarkIcon)
+                        placemark.userData = item.id
+                    }
+                    Log.d(TAG, "Displayed ${state.items.size} car washes on map.")
+                }
+            }
+            is SearchState.Loading -> {
+                Log.d(TAG, "Loading car washes...")
+            }
+            is SearchState.Error -> {
+                Log.e(TAG, "Error searching car washes: ${state.message}")
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                moc.clear()
+            }
+            is SearchState.Idle -> {
+                moc.clear()
+                Log.d(TAG, "Search state is Idle.")
             }
         }
     }
@@ -290,31 +266,18 @@ fun MapScreen(
         if (!locationPermissionGranted) {
             Text(
                 "Для отображения местоположения требуется разрешение на геолокацию.",
-                 Modifier.align(Alignment.Center)
+                Modifier.align(Alignment.Center)
             )
         }
         FloatingActionButton(
             onClick = {
                 currentUserLocationPoint?.let { point ->
                     Log.d(TAG, "FAB Clicked: Moving to user location: (${point.latitude}, ${point.longitude})")
-                    mapView.map.move(
-                        CameraPosition(point, 15.0f, 0.0f, 0.0f), // FAB always zooms to 15
+                    userInitiatedMapMove = false
+                    mapView.mapWindow.map.move(
+                        CameraPosition(point, 15.0f, 0.0f, 0.0f),
                         Animation(Animation.Type.SMOOTH, 1.0f),
-                        object : Map.CameraCallback {
-                            override fun onMoveFinished(completed: Boolean) {
-                                if (completed) {
-                                    Log.d(TAG, "FAB Click: Move to user location FINISHED. Searching car washes and resuming follow.")
-                                    userInitiatedMapMove = false // Возобновляем слежение
-                                    mapViewModel.searchCarWashes(mapView.map.visibleRegion) // Новый поиск
-                                    // initialCameraMoveCompleted should already be true if FAB is used after initial setup,
-                                    // but explicitly setting it true again or ensuring it is true might be an option
-                                    // if FAB can be clicked before first auto-zoom. However, current logic implies
-                                    // currentUserLocationPoint would be null then.
-                                } else {
-                                     Log.w(TAG, "FAB Click: Move to user location NOT completed.")
-                                }
-                            }
-                        }
+                        null
                     )
                 } ?: Toast.makeText(context, "Местоположение пока не определено", Toast.LENGTH_SHORT).show()
             },
@@ -327,5 +290,86 @@ fun MapScreen(
                 contentDescription = "Мое местоположение"
             )
         }
+    }
+
+    if (sheetState.isVisible) {
+        ModalBottomSheet(
+            onDismissRequest = { scope.launch { sheetState.hide() } },
+            sheetState = sheetState,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        ) {
+            selectedCarWashDetails?.let {
+                CarWashDetailSheetContent(details = it)
+            } ?: Box(modifier = Modifier.fillMaxWidth().height(100.dp).padding(16.dp)) {
+                Text("Детали не выбраны", modifier = Modifier.align(Alignment.Center))
+            }
+        }
+    }
+}
+
+@Composable
+fun CarWashDetailSheetContent(details: FakeCarWashDetails) {
+    val windowInfo = LocalWindowInfo.current
+    val density = LocalDensity.current
+    val screenHeight = with(density) { windowInfo.containerSize.height.toDp() }
+    val context = LocalContext.current // Added to get context for Intent
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .heightIn(max = screenHeight * 0.75f)
+    ) {
+        item {
+            Text(text = details.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = details.address, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            details.phones?.let { phoneString ->
+                Text("Телефоны:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                val phoneNumbers = phoneString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                phoneNumbers.forEach { phoneNumber ->
+                    Text(
+                        text = phoneNumber,
+                        style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier
+                            .clickable {
+                                val intent = Intent(Intent.ACTION_DIAL).apply {
+                                    data = Uri.parse("tel:$phoneNumber")
+                                }
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Log.e("MapScreen", "Could not start dialer for $phoneNumber", e)
+                                    Toast
+                                        .makeText(context, "Не удалось открыть приложение для звонка", Toast.LENGTH_SHORT)
+                                        .show()
+                                }
+                            }
+                            .padding(vertical = 4.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            details.workingHours?.let {
+                Text("Время работы:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(it, style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            // Photo, Rating, Call/Route buttons, and Reviews are removed.
+        }
+    }
+}
+
+// ReviewItem Composable removed
+// ReviewItemPreview Composable removed
+
+@Preview(showBackground = true)
+@Composable
+fun CarWashDetailSheetContentPreview() {
+    MaterialTheme {
+        CarWashDetailSheetContent(details = fakeCarWash1Details) // fakeCarWash1Details now has the simplified structure
     }
 }

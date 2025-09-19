@@ -1,13 +1,9 @@
 package ru.devsoland.drydrive
 
 import android.app.Application
-// import android.content.pm.PackageManager // Больше не используется для диагностики ключа Яндекс
 import android.util.Log
 import com.yandex.mapkit.MapKitFactory // Импорт для MapKitFactory
 import dagger.hilt.android.HiltAndroidApp
-// Важно: Импорт вашего BuildConfig. Путь может отличаться, если ваш applicationId другой
-// или если BuildConfig генерируется в другом месте для вашего проекта.
-// Обычно он находится в том же пакете, что и ваш Application класс.
 import ru.devsoland.drydrive.BuildConfig
 
 @HiltAndroidApp
@@ -20,12 +16,12 @@ class DryDriveApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Инициализация Yandex MapKit с использованием BuildConfig
+        // Инициализация Yandex MapKit
         try {
             Log.i(TAG, "Attempting to set Yandex Maps API Key from BuildConfig...")
             // Проверяем, существует ли поле YANDEX_MAPS_API_KEY в BuildConfig
             // и не является ли оно строкой-заглушкой из build.gradle.kts
-            if (BuildConfig.YANDEX_MAPS_API_KEY.isNullOrEmpty() || BuildConfig.YANDEX_MAPS_API_KEY == "your_api_key_here") {
+            if (BuildConfig.YANDEX_MAPS_API_KEY.isEmpty()) {
                 Log.e(TAG, "YANDEX_MAPS_API_KEY in BuildConfig is null, empty, or the placeholder value. Check local.properties and gradle sync!")
                 // Можно здесь выбросить исключение или обработать ошибку, чтобы предотвратить дальнейший сбой MapKit
             } else {

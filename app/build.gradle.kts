@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-parcelize") // <--- ДОБАВЛЕН ПЛАГИН
+    id("kotlin-parcelize")
     id("com.google.dagger.hilt.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
@@ -63,64 +63,77 @@ android {
 }
 
 dependencies {
-    // Core libraries
+
+    // Import the Compose BOM
+    val composeBom = platform("androidx.compose:compose-bom:2025.08.00")
+    implementation(composeBom)
+    androidTestImplementation(composeBom) // For UI tests
+
+    // --- Jetpack Compose - Material 3 ---
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3.adaptive:adaptive") // Optional - For window size utils
+
+    // --- Jetpack Compose - Core UI & Foundation ---
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+
+    // --- Jetpack Compose - Tooling & Preview ---
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest") // Often used with ui-tooling for tests
+
+    // --- Jetpack Compose - Icons (Material 2 style icons, if still needed with M3) ---
+    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // --- Jetpack Compose - Integration ---
+    implementation("androidx.activity:activity-compose") // Version from BoM
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose") // Version from BoM
+    implementation("androidx.compose.runtime:runtime-livedata") // Optional - For LiveData integration, version from BoM
+    implementation("androidx.navigation:navigation-compose:2.9.4") // Navigation usually has its own version cycle
+
+    // --- AndroidX Core & Lifecycle ---
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3")
-    implementation("androidx.activity:activity-compose:1.11.0")
 
-    implementation("com.google.android.material:material:1.13.0")
+    // --- XML Material Components Theme ---
+    implementation("com.google.android.material:material:1.13.0") // <<=== ВОТ ЭТА СТРОКА ВОЗВРАЩЕНА
 
-    //Иконки
-    implementation("androidx.compose.material:material-icons-core:1.7.8")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
-
-    // Jetpack Compose
-    implementation("androidx.compose.ui:ui:1.9.1")
-    implementation("androidx.compose.material3:material3:1.3.2")
-    implementation("androidx.navigation:navigation-compose:2.9.4")
-    implementation("androidx.compose.ui:ui-tooling:1.9.1")
-    implementation("androidx.compose.foundation:foundation:1.9.1")
-
-    debugImplementation("androidx.compose.ui:ui-tooling-data:1.9.1")
-
-    // Retrofit + OkHttp + Serialization
+    // --- Network ---
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:5.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
 
-    // Room
+    // --- Persistence (Room & DataStore) ---
     implementation("androidx.room:room-runtime:2.8.0")
     implementation("androidx.room:room-ktx:2.8.0")
     ksp("androidx.room:room-compiler:2.8.0")
-
-    // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.7")
 
-    // Hilt
+    // --- Dependency Injection (Hilt) ---
     implementation("com.google.dagger:hilt-android:2.57.1")
     ksp("com.google.dagger:hilt-compiler:2.57.1")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0") // For ViewModel with Hilt in Compose Navigation
 
-    // Для ViewModel с Hilt
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
-    // Coroutines
+    // --- Coroutines ---
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
-    // Coil
+    // --- Image Loading (Coil) ---
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
 
-    // Lottie
+    // --- Animations (Lottie) ---
     implementation("com.airbnb.android:lottie-compose:6.6.7")
 
-    // LeakCanary (только для debug)
-    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
-
+    // --- Mapping (Yandex Maps) ---
     implementation("com.yandex.android:maps.mobile:4.22.0-full")
 
-    // Тестовые зависимости
+    // --- Debugging ---
+    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
+
+    // --- Testing ---
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.9.1")
-    debugImplementation("androidx.compose.ui:ui-test-manifest:1.9.1")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4") // Version from BoM
 }
